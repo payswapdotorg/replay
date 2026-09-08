@@ -1,205 +1,229 @@
 #!/usr/bin/env python3
-"""Watchdog for the browser replay stack (cycle: 60s).
+"""watcher.py — resident replay-stack watcher.
 
-Each cycle:
-- restart dead Xvfb / Chrome / dev-server (via procs.py)
-- auto-accept JavaScript dialogs on the active tab (Page.handleJavaScriptDialog
-  {accept:true}; errors are ignored when no dialog is open)
-- auto-select newly created tabs (auth popups) as the active replay tab
-- log new operator messages from scripts/flags/operator_inbox.jsonl
-- maintain the chat.z.ai session registry (scripts/flags/session_registry.json)
-- touch scripts/flags/watcher_heartbeat
+Monitors (gentle, low-frequency):
+  1. target-site login state     -> sets flags/LOGIN_READY when a session exists
+  2. JS dialogs on the browser   -> auto-accepts ("Reload site?" popups)
+  3. operator inbox messages     -> surfaces them into watcher.log
+  4. stack processes             -> restarts dead CDP/dev/replayd/supervisor
+
+Writes log lines to scripts/watcher.log; flag files in scripts/flags/.
+Immortal: top-level restart loop + pidfile; the supervisor relaunches this
+process if it ever dies, and THIS process resurrects the supervisor if IT
+dies (mutual watchdog pair). Run via launch_watcher.py (start_new_session).
 """
 import json
 import os
+import subprocess
 import sys
 import time
+import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import channel
 
-import channel  # noqa: E402
-from procs import (  # noqa: E402
-    TARGET_URL,
-    chrome_up,
-    dev_up,
-    ensure_dirs,
-    start_chrome,
-    start_dev,
-    start_xvfb,
-    xvfb_up,
-)
+BASE = os.path.dirname(os.path.abspath(__file__))
+LOG = os.path.join(BASE, "watcher.log")
+FLAGS = os.path.join(BASE, "flags")
+os.makedirs(FLAGS, exist_ok=True)
+CONSOLE_PORT = int(os.environ.get("REPLAY_PORT", "3000"))
+CDP_PORT = int(os.environ.get("CDP_PORT", "9222"))
+REPLAYD_PORT = int(os.environ.get("REPLAYD_PORT", "3100"))
 
-CYCLE = 60
-SCRIPTS = os.path.dirname(os.path.abspath(__file__))
-FLAGS = os.path.join(SCRIPTS, "flags")
-LOG = os.path.join(SCRIPTS, "watcher.log")
-SEEN_TABS = os.path.join(FLAGS, "seen_tabs.json")
-WATCHER_HEARTBEAT = os.path.join(FLAGS, "watcher_heartbeat")
-OPERATOR_INBOX = os.path.join(FLAGS, "operator_inbox.jsonl")
-OP_WATERMARK = os.path.join(FLAGS, "watcher_op_watermark.txt")
-REGISTRY = os.path.join(FLAGS, "session_registry.json")
-ACTIVE_TAB_FILE = os.path.join(FLAGS, "active_tab.txt")
+STATE = {"login": "unknown"}
+
+
+def py_bin():
+    """Interpreter resolved by deploy.sh (scripts/python_bin.txt)."""
+    try:
+        return open(os.path.join(BASE, "python_bin.txt")).read().strip() or sys.executable
+    except Exception:
+        return sys.executable
 
 
 def log(msg):
-    line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n"
-    with open(LOG, "a") as f:
-        f.write(line)
-
-
-def _read_json(path, default):
+    line = time.strftime("[%H:%M:%S] ") + msg
     try:
-        with open(path) as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-
-def _write_json(path, obj):
-    ensure_dirs()
-    with open(path, "w") as f:
-        json.dump(obj, f, indent=2)
-
-
-def touch_heartbeat():
-    ensure_dirs()
-    with open(WATCHER_HEARTBEAT, "a"):
-        os.utime(WATCHER_HEARTBEAT, None)
-
-
-def restart_dead():
-    if not xvfb_up():
-        log("xvfb down -> starting")
-        start_xvfb()
-    if not chrome_up():
-        log("chrome down -> starting")
-        start_chrome()
-    if not dev_up():
-        log("dev server down -> starting")
-        start_dev()
-
-
-def auto_select_new_tabs(tabs):
-    if not tabs:
-        return
-    seen = _read_json(SEEN_TABS, None)
-    ids = [t.get("id") for t in tabs]
-    if seen is None:
-        # first boot: baseline only, no switching
-        _write_json(SEEN_TABS, ids)
-        return
-    seen = set(seen)
-    fresh = [t for t in tabs if t.get("id") not in seen]
-    if fresh and len(fresh) == 1:
-        new = fresh[0]
-        with open(ACTIVE_TAB_FILE, "w") as f:
-            f.write(new["id"])
-        log(f"new tab auto-selected: {new.get('title', '')!r} {new.get('url', '')}")
-    elif fresh:
-        log(f"{len(fresh)} new tabs appeared (restart?) — not switching")
-    _write_json(SEEN_TABS, ids)
-
-
-def accept_dialogs(tabs):
-    """Auto-accept JS dialogs (beforeunload / alert / confirm) on the active tab.
-
-    Calling Page.handleJavaScriptDialog when no dialog is open raises an
-    error which we intentionally ignore.
-    """
-    if not tabs:
-        return
-    wanted = None
-    try:
-        with open(ACTIVE_TAB_FILE) as f:
-            wanted = f.read().strip()
+        # self-rotate so the log can never grow unbounded
+        if os.path.exists(LOG) and os.path.getsize(LOG) > 2 * 1024 * 1024:
+            with open(LOG, "rb") as f:
+                f.seek(-150 * 1024, 2)
+                tail = f.read()
+            with open(LOG, "wb") as f:
+                f.write(tail)
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
     except Exception:
         pass
-    tab = next((t for t in tabs if t.get("id") == wanted), tabs[0])
     try:
-        c = channel.CDP(tab["webSocketDebuggerUrl"])
+        print(line, flush=True)
+    except Exception:
+        pass
+
+
+def check_login():
+    """Generic: a visible composer = session exists; 'Sign in' link = out."""
+    try:
+        tabs = channel.list_tabs()
+        tab = next((t for t in tabs if (t.get("url") or "").startswith("http")), None)
+        if not tab:
+            return STATE["login"]
+        cdp = channel.CDP(tab["webSocketDebuggerUrl"], timeout=12)
         try:
-            c.call("Page.enable")
-            c.call("Page.handleJavaScriptDialog", {"accept": True})
-            log(f"dialog accepted on {tab.get('url', '')}")
+            has_composer = cdp.eval(
+                "!!document.querySelector('textarea, #chat-input, div[contenteditable=true]')",
+                timeout=8)
+            body = cdp.eval("document.body.innerText || ''", timeout=8) or ""
         finally:
-            c.close()
+            cdp.close()
+        if "Sign in" in body or "Log in" in body:
+            return "logged-out"
+        if has_composer:
+            return "logged-in"
+        return "page:" + str(len(body))
+    except Exception:
+        return STATE["login"]
+
+
+def check_dialogs():
+    """Auto-accept 'Reload site?' / beforeunload dialogs on the active tab."""
+    try:
+        tabs = channel.list_tabs()
+        aid = ""
+        try:
+            aid = open(os.path.join(FLAGS, "active_tab.txt")).read().strip()
+        except Exception:
+            pass
+        tab = next((t for t in tabs if t.get("id") == aid), None)
+        if tab is None and tabs:
+            tab = tabs[0]
+        if not tab:
+            return False
+        cdp = channel.CDP(tab["webSocketDebuggerUrl"], timeout=8)
+        try:
+            cdp.call("Page.enable", {}, timeout=8)
+            cdp.call("Page.handleJavaScriptDialog", {"accept": True}, timeout=8)
+            return True  # a dialog was actually accepted
+        except Exception:
+            return False  # no dialog open — normal case
+        finally:
+            cdp.close()
+    except Exception:
+        return False
+
+
+def check_inbox():
+    """Surface new operator messages into watcher.log so the agent notices."""
+    path = os.path.join(FLAGS, "operator_inbox.jsonl")
+    try:
+        if not os.path.exists(path):
+            return
+        lines = [l for l in open(path, encoding="utf-8").read().split("\n") if l.strip()]
+        n = len(lines)
+        prev = STATE.get("inbox_lines", 0)
+        if n > prev:
+            for l in lines[prev:]:
+                try:
+                    d = json.loads(l)
+                    log(f"OPERATOR MESSAGE: {str(d.get('text'))[:200]}")
+                except Exception:
+                    pass
+        STATE["inbox_lines"] = n
     except Exception:
         pass
 
 
-def log_operator_messages():
-    if not os.path.exists(OPERATOR_INBOX):
-        return
+def check_procs():
+    """Restart dead infrastructure (Chrome/CDP / dev server / replayd /
+    supervisor). Mutual-watchdog: the supervisor restarts us if we die; we
+    restart the supervisor if IT dies — the pair survives unless both die in
+    the same instant."""
+    py = py_bin()
     try:
-        with open(OPERATOR_INBOX) as f:
-            lines = f.readlines()
-    except Exception:
-        return
-    try:
-        with open(OP_WATERMARK) as f:
-            wm = int(f.read().strip())
-    except Exception:
-        wm = 0
-    if len(lines) > wm:
-        for line in lines[wm:]:
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json/version", timeout=3).read()
+        except Exception:
+            log("CDP dead — restarting Chrome + Xvfb")
+            subprocess.run([py, os.path.join(BASE, "launch_stack.py")], timeout=120)
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{CONSOLE_PORT}", timeout=4).read(64)
+        except Exception:
+            log(f"dev server :{CONSOLE_PORT} dead — restarting")
+            subprocess.Popen([py, os.path.join(BASE, "launch_dev.py")],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(5)
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{REPLAYD_PORT}/healthz", timeout=3).read(64)
+        except Exception:
+            log("replayd :3100 dead — restarting")
+            subprocess.Popen([py, os.path.join(BASE, "launch_replayd.py")],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(2)
+        sup_pid = ""
+        try:
+            sup_pid = open(os.path.join(BASE, "supervisor.pid")).read().strip()
+        except Exception:
+            pass
+        alive = False
+        if sup_pid:
             try:
-                msg = json.loads(line)
-                log(f"OPERATOR: {msg.get('text', '')!r}")
+                cmd = open(f"/proc/{sup_pid}/cmdline", "rb").read().decode(errors="replace")
+                alive = "supervisor.py" in cmd
             except Exception:
-                pass
-        ensure_dirs()
-        with open(OP_WATERMARK, "w") as f:
-            f.write(str(len(lines)))
-
-
-def session_registry(tabs):
-    """Track tabs belonging to the target site ($TARGET_URL, chat.z.ai default)."""
-    from urllib.parse import urlparse
-
-    try:
-        host = urlparse(TARGET_URL).host or urlparse(TARGET_URL).netloc
-    except Exception:
-        host = "chat.z.ai"
-    if not host:
-        host = "chat.z.ai"
-    chat = [
-        {"id": t.get("id"), "title": (t.get("title") or "")[:80], "url": t.get("url", "")}
-        for t in tabs
-        if host in t.get("url", "")
-    ]
-    if chat:
-        prev = _read_json(REGISTRY, {"knownUrls": []})
-        urls = set(prev.get("knownUrls", []))
-        for s in chat:
-            urls.add(s["url"])
-        _write_json(
-            REGISTRY,
-            {"ts": int(time.time() * 1000), "sessions": chat, "knownUrls": sorted(urls)},
-        )
-        if len(chat) > 3:
-            log(f"target-site session count = {len(chat)} (> 3) — trim recommended")
-
-
-def cycle():
-    touch_heartbeat()
-    restart_dead()
-    tabs = channel.list_tabs()
-    auto_select_new_tabs(tabs)
-    accept_dialogs(tabs)
-    log_operator_messages()
-    session_registry(tabs)
+                alive = False
+        if not alive:
+            log("supervisor dead — resurrecting")
+            subprocess.Popen(
+                [py, os.path.join(BASE, "supervisor.py")],
+                stdout=open(os.path.join(BASE, "logs", "supervisor.err"), "a"),
+                stderr=subprocess.STDOUT,
+                start_new_session=True)
+    except Exception as e:
+        log(f"proc check error {e!r}")
 
 
 def main():
-    ensure_dirs()
-    log("watcher started")
+    log("watcher online (login + dialogs + operator-inbox + proc watchdog)")
     while True:
         try:
-            cycle()
+            login = check_login()
+            if login != STATE["login"]:
+                log(f"login: {STATE['login']} -> {login}")
+                STATE["login"] = login
+                if login.startswith("logged-in"):
+                    open(os.path.join(FLAGS, "LOGIN_READY"), "w").write(time.strftime("%H:%M:%S"))
+                else:
+                    p = os.path.join(FLAGS, "LOGIN_READY")
+                    if os.path.exists(p):
+                        os.remove(p)
         except Exception as e:
-            log(f"cycle error: {e}")
-        time.sleep(CYCLE)
+            log(f"loop error {e!r}")
+
+        for _ in range(12):
+            check_dialogs()
+            check_inbox()
+            time.sleep(10)
+        check_procs()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        open(os.path.join(BASE, "watcher.pid"), "w").write(str(os.getpid()))
+    except Exception:
+        pass
+    # IMMORTAL: even if main() somehow raises, restart after a short backoff.
+    while True:
+        try:
+            main()
+        except Exception as e:
+            try:
+                log(f"FATAL in main: {e!r} — restarting in 15s")
+            except Exception:
+                pass
+            time.sleep(15)
+        else:
+            try:
+                log("main() returned unexpectedly — restarting in 15s")
+            except Exception:
+                pass
+            time.sleep(15)

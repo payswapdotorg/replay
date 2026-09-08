@@ -1,12 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
+  // CDP bridge endpoints run python helpers; keep long-running screenshot calls allowed
+  serverExternalPackages: [],
+  async rewrites() {
+    return [];
   },
-  reactStrictMode: false,
 };
 
 export default nextConfig;

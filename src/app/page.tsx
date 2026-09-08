@@ -1,633 +1,753 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Activity,
-  Bot,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Globe,
-  Keyboard,
-  MessageSquare,
-  MonitorPlay,
-  RotateCw,
-  Send,
-  User,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 
-interface TabInfo {
-  id: string;
-  title: string;
-  url: string;
+type Status = {
+  ts: string;
+  repo: string;
+  browser_login: string;
+  main_sha?: string;
+  branches?: { name: string; sha: string }[];
+  pulls?: { n: number; state: string; title: string }[];
+};
+
+type Tab = { id: string; title: string; url: string };
+type TabsInfo = { active: string; new: string[]; tabs: Tab[] };
+type Msg = { ts: number; from: "operator" | "agent"; text: string };
+type Inbox = { thread: Msg[]; agent_heartbeat_ms: number; watcher_alive: boolean };
+
+const CONSOLE_VERSION = "v6.1 · realtime drag";
+const START_URL = "https://chat.z.ai/";
+const FRAME_FAST_MS = 220; // while dragging / right after an event
+const FRAME_IDLE_MS = 1300; // steady state
+const MOVE_MIN_INTERVAL_MS = 45; // dragmove throttle
+const DRAG_START_THRESHOLD = 0.004; // fraction of viewport before dragstart fires
+
+function ago(ms: number): string {
+  if (!ms) return "—";
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
 }
 
-interface StatusInfo {
-  ok?: boolean;
-  xvfb?: boolean;
-  chrome?: boolean;
-  dev?: boolean;
-  targetUrl?: string;
-  tabCount?: number;
-  active?: { id: string; title: string; url: string } | null;
-  login?: string;
-  account?: string | null;
-  chatInput?: boolean;
-  agentActiveAgo?: number | null;
-  watcherActiveAgo?: number | null;
-  operatorMessages?: number;
-  agentMessages?: number;
-}
+export default function Console() {
+  const [frame, setFrame] = useState<string>("");
+  const [status, setStatus] = useState<Status | null>(null);
+  const [tabs, setTabs] = useState<TabsInfo>({ active: "", new: [], tabs: [] });
+  const [inbox, setInbox] = useState<Inbox>({ thread: [], agent_heartbeat_ms: 0, watcher_alive: false });
+  const [kb, setKb] = useState("");
+  const [msg, setMsg] = useState("");
+  const [tick, setTick] = useState(0);
+  const [dragStart, setDragStart] = useState<{ fx: number; fy: number } | null>(null);
+  const [dragCur, setDragCur] = useState<{ fx: number; fy: number } | null>(null);
+  const [ripple, setRipple] = useState<{ fx: number; fy: number; k: number } | null>(null);
+  const [lastClick, setLastClick] = useState("");
+  const [domMode, setDomMode] = useState(false);
+  const [navUrl, setNavUrl] = useState("");
+  const imgRef = useRef<HTMLImageElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const autoSelRef = useRef(false);
+  const rippleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragRef = useRef<{ fx: number; fy: number } | null>(null);
+  const dragStartedRef = useRef(false);
+  const lastMoveSentRef = useRef(0);
+  const lastMovePosRef = useRef<{ fx: number; fy: number } | null>(null);
+  const dragCountRef = useRef(0);
+  const fastUntilRef = useRef(0);
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const domModeRef = useRef(false);
+  domModeRef.current = domMode;
+  const sendRef = useRef<
+    ((p: Record<string, unknown>) => Promise<Record<string, unknown> | null>) | null
+  >(null);
+  const refreshRef = useRef<() => void>(() => {});
 
-interface ThreadMessage {
-  ts: number;
-  from: "operator" | "agent";
-  text: string;
-}
+  const bumpFast = useCallback(() => {
+    fastUntilRef.current = Date.now() + 1600;
+  }, []);
 
-const FRAME_POLL_MS = 2500;
-const TABS_POLL_MS = 5000;
-const STATUS_POLL_MS = 5000;
-const INBOX_POLL_MS = 4000;
-const SCROLL_STEP = 400;
-
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host.replace(/^www\./, "");
-  } catch {
-    return url.slice(0, 24);
-  }
-}
-
-function ageLabel(sec: number | null | undefined): string {
-  if (sec === null || sec === undefined) return "unknown";
-  if (sec < 5) return `${sec}s ago`;
-  if (sec < 90) return `${sec}s ago`;
-  if (sec < 5400) return `${Math.round(sec / 60)}m ago`;
-  return `${Math.round(sec / 3600)}h ago`;
-}
-
-function timeLabel(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-}
-
-async function postJSON(url: string, body: unknown): Promise<Response> {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-export default function OperatorConsole() {
-  // ---- replay state
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
-  const [frameOk, setFrameOk] = useState(false);
-  const [frameTs, setFrameTs] = useState(0);
-  const [frameErr, setFrameErr] = useState(false);
-  const objectUrlRef = useRef<string | null>(null);
-  const frameBusyRef = useRef(false);
-
-  // ---- tabs / status / thread state
-  const [tabs, setTabs] = useState<TabInfo[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusInfo | null>(null);
-  const [messages, setMessages] = useState<ThreadMessage[]>([]);
-  const [msgInput, setMsgInput] = useState("");
-  const [typeInput, setTypeInput] = useState("");
-  const [lastAction, setLastAction] = useState("ready");
-  const [sendingMsg, setSendingMsg] = useState(false);
-  const threadRef = useRef<HTMLDivElement | null>(null);
-
-  // ---- frame polling (blob URLs, revoke the old one, keep last frame on error)
   const refreshFrame = useCallback(async () => {
-    if (frameBusyRef.current) return;
-    frameBusyRef.current = true;
     try {
-      const res = await fetch("/api/frame", { cache: "no-store" });
-      if (!res.ok) {
-        setFrameErr(true);
-        return;
-      }
-      const blob = await res.blob();
-      if (blob.size < 100) {
-        setFrameErr(true);
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const old = objectUrlRef.current;
-      objectUrlRef.current = url;
-      setFrameUrl(url);
-      setFrameOk(true);
-      setFrameErr(false);
-      setFrameTs(Date.now());
-      if (old) URL.revokeObjectURL(old);
+      const r = await fetch("/api/frame", { cache: "no-store" });
+      if (!r.ok) return;
+      const blob = await r.blob();
+      setFrame((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return URL.createObjectURL(blob);
+      });
     } catch {
-      setFrameErr(true);
-    } finally {
-      frameBusyRef.current = false;
+      /* keep last frame */
     }
   }, []);
 
-  useEffect(() => {
-    refreshFrame();
-    const timer = setInterval(refreshFrame, FRAME_POLL_MS);
-    return () => {
-      clearInterval(timer);
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
+  const refreshStatus = useCallback(async () => {
+    try {
+      const r = await fetch("/api/status", { cache: "no-store" });
+      if (r.ok) setStatus(await r.json());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const refreshTabs = useCallback(async () => {
+    try {
+      const r = await fetch("/api/tabs", { cache: "no-store" });
+      if (!r.ok) return;
+      const d = (await r.json()) as TabsInfo;
+      setTabs(d);
+      // auto-focus newly opened tabs (login popups) so events follow them
+      if (!autoSelRef.current && d.new && d.new.length > 0) {
+        autoSelRef.current = true;
+        const nid = d.new[0];
+        await fetch("/api/tabs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: nid }),
+        });
+        d.active = nid;
+        setTabs(d);
+        bumpFast();
+        setTimeout(() => {
+          autoSelRef.current = false;
+        }, 15000);
       }
+    } catch {
+      /* ignore */
+    }
+  }, [bumpFast]);
+
+  const refreshInbox = useCallback(async () => {
+    try {
+      const r = await fetch("/api/inbox", { cache: "no-store" });
+      if (r.ok) setInbox(await r.json());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  // Adaptive frame loop: fast (~4.5fps) while dragging or right after an
+  // event, relaxed otherwise. Sequential — no request pileup.
+  useEffect(() => {
+    let cancelled = false;
+    const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+    (async () => {
+      while (!cancelled) {
+        await refreshFrame();
+        const fast = dragRef.current !== null || fastUntilRef.current > Date.now();
+        await sleep(fast ? FRAME_FAST_MS : FRAME_IDLE_MS);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, [refreshFrame]);
 
-  // ---- tabs polling
-  const refreshTabs = useCallback(async () => {
-    try {
-      const res = await fetch("/api/tabs", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { tabs?: TabInfo[]; active?: string | null };
-      setTabs(data.tabs ?? []);
-      setActiveTab(data.active ?? null);
-    } catch {
-      /* keep last known tabs */
-    }
-  }, []);
-
   useEffect(() => {
+    refreshStatus();
     refreshTabs();
-    const timer = setInterval(refreshTabs, TABS_POLL_MS);
-    return () => clearInterval(timer);
-  }, [refreshTabs]);
-
-  // ---- status polling
-  useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/status", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as StatusInfo;
-        if (alive) setStatus(data);
-      } catch {
-        /* keep last known status */
-      }
-    };
-    poll();
-    const timer = setInterval(poll, STATUS_POLL_MS);
+    refreshInbox();
+    const st = setInterval(refreshStatus, 20000);
+    const tb = setInterval(refreshTabs, 5000);
+    const ib = setInterval(refreshInbox, 4000);
+    const tk = setInterval(() => setTick((t) => t + 1), 10000);
     return () => {
-      alive = false;
-      clearInterval(timer);
+      clearInterval(st);
+      clearInterval(tb);
+      clearInterval(ib);
+      clearInterval(tk);
     };
-  }, []);
-
-  // ---- inbox polling + autoscroll
-  useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/inbox", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { messages?: ThreadMessage[] };
-        if (alive) setMessages(data.messages ?? []);
-      } catch {
-        /* keep last known thread */
-      }
-    };
-    poll();
-    const timer = setInterval(poll, INBOX_POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, []);
+  }, [refreshStatus, refreshTabs, refreshInbox]);
 
   useEffect(() => {
     const el = threadRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [inbox.thread.length]);
 
-  // ---- input events into the browser
   const sendEvent = useCallback(
-    async (spec: Record<string, unknown>) => {
-      setLastAction(`${String(spec.type)}…`);
+    async (payload: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
+      bumpFast();
       try {
-        const res = await postJSON("/api/event", spec);
-        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        setLastAction(
-          data.ok === false ? `error: ${data.error ?? "unknown"}` : `${String(spec.type)} ok`,
-        );
-      } catch {
-        setLastAction("error: network");
-      }
-      window.setTimeout(() => {
-        refreshFrame();
-      }, 350);
-    },
-    [refreshFrame],
-  );
-
-  /**
-   * CRITICAL: click/drag coordinates are mapped with the image's
-   * naturalWidth / naturalHeight — NEVER hardcoded viewport numbers. The real
-   * viewport (e.g. 1439x756) differs from the requested window size (1440x900).
-   * Press-drag-release sends a drag event (slider captchas); a press-release
-   * under 6px sends a click.
-   */
-  const dragStartRef = useRef<{ vx: number; vy: number; cx: number; cy: number } | null>(null);
-
-  const toViewport = (img: HTMLImageElement, e: React.MouseEvent<HTMLImageElement>) => ({
-    x: Math.round(((e.clientX - img.getBoundingClientRect().left) / img.getBoundingClientRect().width) * img.naturalWidth),
-    y: Math.round(((e.clientY - img.getBoundingClientRect().top) / img.getBoundingClientRect().height) * img.naturalHeight),
-  });
-
-  const onFrameMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    const v = toViewport(img, e);
-    dragStartRef.current = { vx: v.x, vy: v.y, cx: e.clientX, cy: e.clientY };
-  };
-
-  const onFrameMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
-    const start = dragStartRef.current;
-    dragStartRef.current = null;
-    if (!start) return;
-    const img = e.currentTarget;
-    if (!img.naturalWidth || !img.naturalHeight) return;
-    const end = toViewport(img, e);
-    const dist = Math.hypot(e.clientX - start.cx, e.clientY - start.cy);
-    if (dist < 6) {
-      sendEvent({ type: "click", x: end.x, y: end.y });
-    } else {
-      sendEvent({
-        type: "drag",
-        fromX: start.vx,
-        fromY: start.vy,
-        toX: end.x,
-        toY: end.y,
-      });
-    }
-  };
-
-  const selectTab = useCallback(
-    async (id: string) => {
-      setLastAction("switching tab…");
-      try {
-        const res = await postJSON("/api/tabs", { id });
-        const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (data.ok === false) {
-          setLastAction(`error: ${data.error ?? "tab switch failed"}`);
-          return;
+        const r = await fetch("/api/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        let j: Record<string, unknown> | null = null;
+        try {
+          j = await r.json();
+        } catch {
+          /* bridge may return plain ok */
         }
-        setActiveTab(id);
-        setLastAction("tab switched");
-        refreshTabs();
-        refreshFrame();
+        setTimeout(refreshFrame, 350);
+        return j;
       } catch {
-        setLastAction("error: network");
+        return null;
       }
     },
-    [refreshFrame, refreshTabs],
+    [refreshFrame, bumpFast]
   );
 
-  const sendMessage = useCallback(async () => {
-    const text = msgInput.trim();
-    if (!text || sendingMsg) return;
-    setSendingMsg(true);
-    setMsgInput("");
-    try {
-      const res = await postJSON("/api/inbox", { text });
-      if (res.ok) {
-        setLastAction("message sent to agent");
-        const data = (await fetch("/api/inbox", { cache: "no-store" }).then((r) =>
-          r.json(),
-        )) as { messages?: ThreadMessage[] };
-        setMessages(data.messages ?? []);
-      } else {
-        setLastAction("error: message failed");
+  // Ordered fire-and-forget queue for streamed drag events. Strict ordering
+  // (each request waits for the previous) so moves never arrive out of order.
+  const queueEvent = useCallback((payload: Record<string, unknown>) => {
+    bumpFast();
+    queueRef.current = queueRef.current
+      .then(async () => {
+        try {
+          await fetch("/api/event", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        } catch {
+          /* next event still queued */
+        }
+      })
+      .catch(() => {});
+  }, [bumpFast]);
+
+  useEffect(() => {
+    sendRef.current = sendEvent;
+    refreshRef.current = refreshFrame;
+  }, [sendEvent, refreshFrame]);
+
+  // Native (non-React) pointer listeners on the replay image. React's
+  // delegated handlers were proven NOT to fire on this <img> in some page
+  // states — native listeners are immune to that. Pointer events also cover
+  // touch. Drags STREAM live: dragstart on first real movement, dragmove
+  // throttled, dragend with the exact final position.
+  useEffect(() => {
+    const fracFromEvent = (ev: { clientX: number; clientY: number }) => {
+      const img = imgRef.current;
+      if (!img) return null;
+      const rect = img.getBoundingClientRect();
+      if (rect.width < 2 || rect.height < 2) return null;
+      return {
+        fx: Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width)),
+        fy: Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height)),
+      };
+    };
+
+    const onDown = (ev: PointerEvent) => {
+      if (ev.pointerType === "mouse" && ev.button !== 0) return;
+      const img = ev.currentTarget as HTMLElement | null;
+      if (img && typeof img.setPointerCapture === "function") {
+        try {
+          img.setPointerCapture(ev.pointerId);
+        } catch {
+          /* capture best-effort */
+        }
       }
-    } catch {
-      setLastAction("error: network");
-    } finally {
-      setSendingMsg(false);
-    }
-  }, [msgInput, sendingMsg]);
+      const p = fracFromEvent(ev);
+      if (!p) return;
+      ev.preventDefault();
+      dragRef.current = p;
+      dragStartedRef.current = false;
+      lastMoveSentRef.current = 0;
+      lastMovePosRef.current = null;
+      dragCountRef.current = 0;
+      setDragStart(p);
+      setDragCur(p);
+    };
 
-  const typeAndEnter = useCallback(async () => {
-    const text = typeInput;
+    const onMove = (ev: PointerEvent) => {
+      const start = dragRef.current;
+      if (!start) return;
+      const p = fracFromEvent(ev);
+      if (!p) return;
+      setDragCur(p);
+      if (!dragStartedRef.current) {
+        // only commit to a drag after real movement — clicks stay clicks
+        const d = Math.hypot(p.fx - start.fx, p.fy - start.fy);
+        if (d < DRAG_START_THRESHOLD) return;
+        dragStartedRef.current = true;
+        lastMovePosRef.current = p;
+        lastMoveSentRef.current = performance.now();
+        dragCountRef.current = 1;
+        queueEvent({ type: "dragstart", fx: start.fx, fy: start.fy });
+        queueEvent({ type: "dragmove", fx: p.fx, fy: p.fy });
+        setLastClick("drag live — keep moving…");
+        return;
+      }
+      const now = performance.now();
+      const last = lastMovePosRef.current;
+      const moved = last ? Math.hypot(p.fx - last.fx, p.fy - last.fy) : 1;
+      if (now - lastMoveSentRef.current >= MOVE_MIN_INTERVAL_MS && moved >= 0.002) {
+        lastMoveSentRef.current = now;
+        lastMovePosRef.current = p;
+        dragCountRef.current += 1;
+        queueEvent({ type: "dragmove", fx: p.fx, fy: p.fy });
+      }
+    };
+
+    const finishDrag = (end: { fx: number; fy: number }) => {
+      queueEvent({ type: "dragmove", fx: end.fx, fy: end.fy }); // exact final pos
+      queueEvent({ type: "dragend", fx: end.fx, fy: end.fy });
+      setLastClick(`drag complete — ${dragCountRef.current} live moves sent`);
+      setTimeout(() => refreshRef.current(), 400);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      const start = dragRef.current;
+      dragRef.current = null;
+      setDragStart(null);
+      setDragCur(null);
+      if (!start) return;
+      const end = fracFromEvent(ev) || start;
+      if (dragStartedRef.current) {
+        finishDrag(end);
+        return;
+      }
+      // click path (unchanged semantics — no drag events were ever sent)
+      if (rippleTimer.current) clearTimeout(rippleTimer.current);
+      setRipple({ fx: end.fx, fy: end.fy, k: Date.now() });
+      rippleTimer.current = setTimeout(() => setRipple(null), 900);
+      const useDom = domModeRef.current;
+      sendRef
+        .current?.(useDom ? { type: "domclick", fx: end.fx, fy: end.fy } : { type: "click", fx: end.fx, fy: end.fy })
+        .then((r) => {
+          if (r && r.ok === false) {
+            setLastClick(`event error: ${String(r.error ?? "unknown")} — retry`);
+            return;
+          }
+          const t = (r?.target as { tag?: string; text?: string; dx?: number; dy?: number } | undefined) || undefined;
+          const label = t
+            ? t.text
+              ? `${t.tag} "${t.text}"`
+              : t.tag || "?"
+            : "(no target info)";
+          const off = t && (t.dx || t.dy) ? ` (+${Math.abs(t.dx!)}px,${Math.abs(t.dy!)}px)` : "";
+          setLastClick(r ? `${useDom ? "dom-click" : "clicked"} → ${label}${off}` : "event failed — retry");
+        });
+    };
+
+    const onCancel = () => {
+      const start = dragRef.current;
+      dragRef.current = null;
+      setDragStart(null);
+      setDragCur(null);
+      if (start && dragStartedRef.current) {
+        const last = lastMovePosRef.current || start;
+        queueEvent({ type: "dragend", fx: last.fx, fy: last.fy });
+      }
+    };
+
+    const attach = () => {
+      const img = imgRef.current;
+      if (!img) return null;
+      img.addEventListener("pointerdown", onDown);
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onCancel);
+      return () => {
+        img.removeEventListener("pointerdown", onDown);
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onCancel);
+      };
+    };
+
+    let detach = attach();
+    // if the <img> isn't mounted yet, retry briefly until it appears
+    const retry = setInterval(() => {
+      if (!detach) {
+        detach = attach();
+        if (detach) clearInterval(retry);
+      }
+    }, 500);
+    return () => {
+      clearInterval(retry);
+      detach?.();
+    };
+  }, [queueEvent]);
+
+  // Type text into the page WITHOUT auto-Enter (auto-Enter submits login
+  // forms mid-typing). Enter is a separate explicit button. The daemon
+  // auto-focuses the first visible input if none is focused.
+  const sendKeys = () => {
+    if (!kb.trim()) return;
+    const n = kb.length;
+    sendEvent({ type: "type", text: kb }).then((r) => {
+      const focus = r && typeof r.focus === "string" ? r.focus : "";
+      setLastClick(`typed ${n} chars${focus ? ` · ${focus}` : ""}`);
+    });
+    setKb("");
+  };
+
+  const sendMsg = async () => {
+    const text = msg.trim();
     if (!text) return;
-    setTypeInput("");
-    setLastAction("typing into page…");
+    setMsg("");
     try {
-      await postJSON("/api/event", { type: "type", text });
-      await postJSON("/api/event", { type: "enter" });
-      setLastAction("typed + enter");
+      await fetch("/api/inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      setTimeout(refreshInbox, 500);
     } catch {
-      setLastAction("error: network");
+      /* ignore */
     }
-    window.setTimeout(() => {
-      refreshFrame();
-    }, 350);
-  }, [typeInput, refreshFrame]);
+  };
 
-  const activeUrl = status?.active?.url ?? tabs.find((t) => t.id === activeTab)?.url ?? "";
-  const targetUrl = status?.targetUrl || "https://chat.z.ai/";
-  const targetHost = hostOf(targetUrl);
-  const frameAge = frameTs ? Math.max(0, Math.round((Date.now() - frameTs) / 1000)) : null;
-  const loginBadge =
-    status?.login === "signed-in" ? (
-      <Badge className="bg-emerald-600 hover:bg-emerald-600">Logged in</Badge>
-    ) : status?.login === "signed-out" ? (
-      <Badge className="bg-amber-600 hover:bg-amber-600">Not logged in</Badge>
-    ) : (
-      <Badge variant="secondary">Login state unknown</Badge>
-    );
+  const selectTab = async (id: string) => {
+    autoSelRef.current = true;
+    try {
+      await fetch("/api/tabs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      setTabs((t) => ({ ...t, active: id }));
+      bumpFast();
+      setTimeout(() => refreshRef.current(), 300);
+    } finally {
+      setTimeout(() => {
+        autoSelRef.current = false;
+      }, 5000);
+    }
+  };
+
+  const doNav = () => {
+    let u = navUrl.trim();
+    if (!u) return;
+    if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+    setNavUrl("");
+    sendEvent({ type: "nav", url: u });
+  };
+
+  const loginColor =
+    (status?.browser_login ?? "").startsWith("logged-in")
+      ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+      : (status?.browser_login ?? "") === "logged-out"
+        ? "text-red-700 bg-red-50 border-red-200"
+        : "text-amber-700 bg-amber-50 border-amber-200";
+
+  const activeTab = tabs.tabs.find((t) => t.id === tabs.active);
+  const lastAgent = inbox.thread.filter((m) => m.from === "agent").slice(-1)[0];
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
-          <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
-            <span
-              className={`absolute inline-flex h-full w-full rounded-full ${
-                frameOk ? "animate-ping bg-emerald-500/60" : "bg-muted-foreground/40"
-              }`}
-            />
-            <span
-              className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                frameOk ? "bg-emerald-600" : "bg-muted-foreground"
-              }`}
-            />
+    <main className="min-h-screen flex flex-col bg-neutral-50 text-neutral-900">
+      <header className="border-b border-neutral-200 bg-white px-4 py-3">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-3">
+          <h1 className="text-lg font-semibold tracking-tight">Replay Console</h1>
+          <span className="text-[10px] text-neutral-400 font-mono border border-neutral-200 rounded px-1.5 py-0.5">
+            {CONSOLE_VERSION}
           </span>
-          <div className="mr-auto min-w-0">
-            <h1 className="truncate text-base font-semibold leading-tight sm:text-lg">
-              Replay Console
-            </h1>
-            <p className="truncate text-xs text-muted-foreground">
-              Live browser replay · click the screenshot to interact, drag for sliders · operator ⇄ agent thread
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {loginBadge}
-            <Badge variant={status?.chrome ? "default" : "destructive"}>
-              Chrome {status?.chrome ? "up" : "down"}
-            </Badge>
-            <Badge variant="outline">agent {ageLabel(status?.agentActiveAgo)}</Badge>
+          <span className="text-xs text-neutral-500">
+            browser session {status?.ts ? `· ${status.ts}` : ""}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <span
+              className={`px-2 py-1 rounded-md border text-xs font-medium ${
+                inbox.watcher_alive
+                  ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                  : "text-red-700 bg-red-50 border-red-200"
+              }`}
+            >
+              watcher {inbox.watcher_alive ? "alive" : "down"}
+            </span>
+            <span className={`px-2 py-1 rounded-md border text-xs font-medium ${loginColor}`}>
+              browser: {status?.browser_login ?? "…"}
+            </span>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 px-4 py-4 lg:flex-row">
-        {/* -------- left: browser replay -------- */}
-        <section className="min-w-0 flex-1" aria-label="Live browser replay">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <MonitorPlay className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                <CardTitle className="text-base">Browser replay</CardTitle>
-                {frameOk ? (
-                  <Badge className="bg-emerald-600 hover:bg-emerald-600">
-                    live · {frameAge === null ? "" : `${frameAge}s old`}
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive">{frameErr ? "no signal" : "connecting"}</Badge>
-                )}
-                <span className="ml-auto truncate text-xs text-muted-foreground">
-                  {activeUrl ? hostOf(activeUrl) : "no active tab"}
-                </span>
+      <section className="flex-1 max-w-7xl w-full mx-auto px-4 py-4 grid gap-4 lg:grid-cols-[1fr_380px]">
+        <div className="flex flex-col gap-3">
+          <div className="border border-neutral-200 rounded-lg bg-white p-3">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <h2 className="text-sm font-semibold">Browser replay (click / drag live)</h2>
+              <div className="flex gap-1 items-center">
+                <div className="flex rounded border border-neutral-300 overflow-hidden" title="click mode: real mouse events vs direct DOM .click()">
+                  <button
+                    className={`px-2 py-1 text-xs ${!domMode ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 hover:bg-neutral-100"}`}
+                    onClick={() => setDomMode(false)}
+                  >
+                    Mouse
+                  </button>
+                  <button
+                    className={`px-2 py-1 text-xs ${domMode ? "bg-neutral-900 text-white" : "bg-white text-neutral-600 hover:bg-neutral-100"}`}
+                    onClick={() => setDomMode(true)}
+                  >
+                    DOM click
+                  </button>
+                </div>
+                <button
+                  className="px-2 py-1 text-xs border border-neutral-300 rounded hover:bg-neutral-100"
+                  onClick={() => sendEvent({ type: "nav", url: START_URL })}
+                >
+                  chat.z.ai
+                </button>
+                <button
+                  className="px-2 py-1 text-xs border border-neutral-300 rounded hover:bg-neutral-100"
+                  onClick={() => sendEvent({ type: "reload" })}
+                  title="reload page"
+                >
+                  ⟳
+                </button>
+                <button
+                  className="px-2 py-1 text-xs border border-neutral-300 rounded hover:bg-neutral-100"
+                  onClick={() => sendEvent({ type: "scroll", deltaY: 300, fx: 0.5, fy: 0.5 })}
+                >
+                  ↓
+                </button>
+                <button
+                  className="px-2 py-1 text-xs border border-neutral-300 rounded hover:bg-neutral-100"
+                  onClick={() => sendEvent({ type: "scroll", deltaY: -300, fx: 0.5, fy: 0.5 })}
+                >
+                  ↑
+                </button>
               </div>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              {/* tab chips */}
-              <nav aria-label="Browser tabs" className="thin-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {tabs.length === 0 && (
-                  <span className="text-xs text-muted-foreground">no tabs</span>
-                )}
-                {tabs.map((t) => (
+            </div>
+
+            {/* Tab bar — events + frame follow the selected tab */}
+            {tabs.tabs.length > 0 && (
+              <div className="flex gap-1 flex-wrap mb-2">
+                {tabs.tabs.map((t) => (
                   <button
                     key={t.id}
-                    type="button"
                     onClick={() => selectTab(t.id)}
-                    aria-pressed={t.id === activeTab}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      t.id === activeTab
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                    title={t.url}
+                    className={`px-2 py-1 text-[11px] rounded border max-w-[220px] truncate ${
+                      t.id === tabs.active
+                        ? "bg-neutral-900 text-white border-neutral-900"
+                        : "bg-white text-neutral-600 border-neutral-300 hover:bg-neutral-100"
+                    } ${tabs.new?.includes(t.id) ? "ring-2 ring-amber-400" : ""}`}
                   >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        t.url.includes(targetHost) ? "bg-emerald-500" : "bg-muted-foreground/50"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <span className="max-w-36 truncate">{hostOf(t.url)}</span>
-                    <span className="max-w-48 truncate opacity-70">{t.title}</span>
+                    {tabs.new?.includes(t.id) ? "✦ " : ""}
+                    {t.title || t.url}
                   </button>
                 ))}
-              </nav>
+              </div>
+            )}
 
-              {/* live frame */}
-              <div className="relative overflow-hidden rounded-md border bg-muted/60">
-                {frameUrl ? (
-                  <img
-                    src={frameUrl}
-                    alt="Live screenshot of the resident agent's browser"
-                    onMouseDown={onFrameMouseDown}
-                    onMouseUp={onFrameMouseUp}
-                    onMouseLeave={() => {
-                      dragStartRef.current = null;
-                    }}
-                    draggable={false}
-                    className="block w-full cursor-crosshair select-none"
-                    aria-label="Browser replay screenshot; click to interact, drag for sliders"
+            <div className="relative rounded-md overflow-hidden bg-neutral-900 flex items-center justify-center">
+              {frame ? (
+                <img
+                  ref={imgRef}
+                  src={frame}
+                  alt="live browser view"
+                  className="max-w-full max-h-[62vh] cursor-pointer select-none touch-none"
+                  draggable={false}
+                />
+              ) : (
+                <div className="text-neutral-400 text-sm py-24">connecting to browser…</div>
+              )}
+              {dragStart && dragCur && (
+                <svg
+                  className="pointer-events-none absolute inset-0 w-full h-full"
+                  aria-hidden="true"
+                >
+                  <line
+                    x1={`${dragStart.fx * 100}%`}
+                    y1={`${dragStart.fy * 100}%`}
+                    x2={`${dragCur.fx * 100}%`}
+                    y2={`${dragCur.fy * 100}%`}
+                    stroke="#f59e0b"
+                    strokeWidth="3"
+                    strokeDasharray="8 4"
                   />
-                ) : (
-                  <Skeleton className="aspect-[1440/756] w-full" />
-                )}
-                {frameUrl && frameErr && (
-                  <div className="absolute left-2 top-2 rounded bg-amber-600 px-2 py-0.5 text-xs font-medium text-white">
-                    stale frame — keeping last image
-                  </div>
-                )}
-              </div>
-
-              {/* controls */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1" role="group" aria-label="Scroll the page">
-                  <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Scroll up" onClick={() => sendEvent({ type: "scroll", dy: -SCROLL_STEP })}>
-                    <ChevronUp className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Scroll down" onClick={() => sendEvent({ type: "scroll", dy: SCROLL_STEP })}>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Scroll left" onClick={() => sendEvent({ type: "scroll", dx: -SCROLL_STEP })}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Scroll right" onClick={() => sendEvent({ type: "scroll", dx: SCROLL_STEP })}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <circle cx={`${dragStart.fx * 100}%`} cy={`${dragStart.fy * 100}%`} r="6" fill="#f59e0b" />
+                  <circle cx={`${dragCur.fx * 100}%`} cy={`${dragCur.fy * 100}%`} r="6" fill="#ef4444" />
+                </svg>
+              )}
+              {ripple && (
+                <div
+                  key={ripple.k}
+                  className="pointer-events-none absolute"
+                  style={{
+                    left: `${ripple.fx * 100}%`,
+                    top: `${ripple.fy * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                  }}
+                >
+                  <div className="w-6 h-6 rounded-full border-2 border-emerald-400 animate-ping" />
                 </div>
-                <Button variant="outline" className="h-10" onClick={() => sendEvent({ type: "reload" })}>
-                  <RotateCw className="mr-1.5 h-4 w-4" aria-hidden="true" /> Reload
-                </Button>
-                <Button variant="outline" className="h-10" onClick={() => sendEvent({ type: "nav", url: targetUrl })}>
-                  <Globe className="mr-1.5 h-4 w-4" aria-hidden="true" /> {targetHost}
-                </Button>
-                <span className="ml-auto max-w-full truncate text-xs text-muted-foreground" aria-live="polite">
-                  {lastAction}
-                </span>
-              </div>
-
-              {/* keyboard box: type into the page */}
-              <div className="flex items-center gap-2">
-                <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  value={typeInput}
-                  onChange={(e) => setTypeInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") typeAndEnter();
-                  }}
-                  placeholder="Type into the page, then press Enter…"
-                  aria-label="Type text into the browser page"
-                  className="h-10"
-                />
-                <Button className="h-10 shrink-0" onClick={typeAndEnter} disabled={!typeInput}>
-                  Type ↵
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* -------- right: status + operator⇄agent thread -------- */}
-        <aside className="flex w-full flex-col gap-4 lg:w-[380px]" aria-label="Agent status and messages">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                <CardTitle className="text-base">Status</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">Display (Xvfb)</dt>
-                <dd>{status?.xvfb ? "up" : "down"}</dd>
-                <dt className="text-muted-foreground">Chrome (CDP)</dt>
-                <dd>{status?.chrome ? "up" : "down"}</dd>
-                <dt className="text-muted-foreground">Dev server</dt>
-                <dd>{status?.dev ? "up" : "down"}</dd>
-                <dt className="text-muted-foreground">Active tab</dt>
-                <dd className="min-w-0 truncate" title={status?.active?.url ?? ""}>
-                  {status?.active ? `${hostOf(status.active.url)} — ${status.active.title || "untitled"}` : "none"}
-                </dd>
-                <dt className="text-muted-foreground">Login</dt>
-                <dd className="min-w-0 truncate">
-                  {status?.login === "signed-in"
-                    ? `signed in${status.account ? ` (${status.account})` : ""}`
-                    : status?.login === "signed-out"
-                      ? "not signed in — use Sign in → Continue with email"
-                      : "unknown"}
-                </dd>
-                <dt className="text-muted-foreground">Browser tabs</dt>
-                <dd>{status?.tabCount ?? tabs.length}</dd>
-                <dt className="text-muted-foreground">Agent last active</dt>
-                <dd>{ageLabel(status?.agentActiveAgo)}</dd>
-                <dt className="text-muted-foreground">Watcher</dt>
-                <dd>{ageLabel(status?.watcherActiveAgo)}</dd>
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card className="flex min-h-72 flex-col">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-                <CardTitle className="text-base">Operator ⇄ Agent</CardTitle>
-                <Badge variant="outline" className="ml-auto">
-                  {messages.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <div
-                ref={threadRef}
-                className="thin-scroll flex max-h-96 flex-1 flex-col gap-2 overflow-y-auto pr-1"
-                role="log"
-                aria-label="Message thread with the resident agent"
-                aria-live="polite"
+              )}
+              {dragStart && (
+                <div className="absolute top-2 left-2 bg-amber-500/90 text-white text-[10px] px-2 py-1 rounded pointer-events-none">
+                  drag streaming live — release to complete
+                </div>
+              )}
+            </div>
+            <div className="mt-1 text-[11px] text-neutral-400 truncate" aria-live="polite">
+              {activeTab ? `${activeTab.title} — ${activeTab.url}` : ""}
+            </div>
+            <div
+              className="mt-1 text-[11px] text-neutral-600 font-medium truncate"
+              aria-live="polite"
+            >
+              {lastClick || "click feedback appears here (target element + offsets)"}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                className="flex-1 border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                placeholder="type into the browser page (auto-focuses the first field)"
+                value={kb}
+                onChange={(e) => setKb(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendKeys()}
+                aria-label="keyboard input for browser page"
+              />
+              <button
+                className="px-3 py-1.5 text-sm bg-neutral-900 text-white rounded hover:bg-neutral-700"
+                onClick={sendKeys}
               >
-                {messages.length === 0 && (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    No messages yet — say hello to the agent.
-                  </p>
-                )}
-                {messages.map((m, i) => (
-                  <div
-                    key={`${m.ts}-${i}`}
-                    className={`flex flex-col gap-0.5 ${m.from === "operator" ? "items-end" : "items-start"}`}
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      {m.from === "operator" ? (
-                        <User className="h-3 w-3" aria-hidden="true" />
-                      ) : (
-                        <Bot className="h-3 w-3" aria-hidden="true" />
-                      )}
-                      <span>{m.from === "operator" ? "you" : "agent"}</span>
-                      <span aria-hidden="true">·</span>
-                      <time dateTime={new Date(m.ts).toISOString()}>{timeLabel(m.ts)}</time>
-                    </div>
-                    <div
-                      className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                        m.from === "operator"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
-                      }`}
-                    >
-                      {m.text}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 border-t pt-3">
-                <Input
-                  value={msgInput}
-                  onChange={(e) => setMsgInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") sendMessage();
-                  }}
-                  placeholder="Message the agent…"
-                  aria-label="Message the resident agent"
-                  className="h-11"
-                />
-                <Button className="h-11 shrink-0" onClick={sendMessage} disabled={!msgInput.trim() || sendingMsg}>
-                  <Send className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Send
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </aside>
-      </main>
+                Type
+              </button>
+              <button
+                className="px-3 py-1.5 text-sm border border-neutral-300 rounded hover:bg-neutral-100"
+                onClick={() => sendEvent({ type: "enter" })}
+                title="press Enter in the page"
+              >
+                ↵
+              </button>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                className="flex-1 border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                placeholder="navigate to URL…"
+                value={navUrl}
+                onChange={(e) => setNavUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && doNav()}
+                aria-label="navigate the browser to a URL"
+              />
+              <button
+                className="px-3 py-1.5 text-sm border border-neutral-300 rounded hover:bg-neutral-100"
+                onClick={doNav}
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        </div>
 
-      <footer className="mt-auto border-t bg-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-xs text-muted-foreground">
-          <span>
-            replay {frameOk ? "live" : "down"} · frame {frameAge === null ? "—" : `${frameAge}s`} · poll{" "}
-            {FRAME_POLL_MS / 1000}s
-          </span>
-          <span>{tabs.length} tab{tabs.length === 1 ? "" : "s"}</span>
-          <span>agent active {ageLabel(status?.agentActiveAgo)}</span>
-          <span className="ml-auto">clicks &amp; drags map via image natural size · never hardcoded</span>
+        <div className="flex flex-col gap-3">
+          {/* Operator ⇄ agent thread */}
+          <div className="border border-neutral-200 rounded-lg bg-white p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">Message the agent</h2>
+              <span className="text-[11px] text-neutral-400">
+                agent active {tick ? "" : ""}{ago(inbox.agent_heartbeat_ms || 0)}
+              </span>
+            </div>
+            <div
+              ref={threadRef}
+              className="max-h-64 overflow-y-auto space-y-2 pr-1 mb-2 text-sm"
+              aria-label="message thread"
+            >
+              {inbox.thread.length === 0 && (
+                <p className="text-xs text-neutral-400 py-4 text-center">
+                  No messages yet — send one below; the resident agent reads and answers
+                  from this thread.
+                </p>
+              )}
+              {inbox.thread.map((m, i) => (
+                <div
+                  key={`${m.ts}-${i}`}
+                  className={`rounded-lg px-3 py-2 max-w-[90%] ${
+                    m.from === "operator"
+                      ? "ml-auto bg-neutral-900 text-white"
+                      : "bg-neutral-100 text-neutral-800"
+                  }`}
+                >
+                  <div className="text-[10px] opacity-60 mb-0.5">
+                    {m.from === "operator" ? "you" : "agent"} ·{" "}
+                    {new Date(m.ts).toLocaleTimeString()}
+                  </div>
+                  <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 border border-neutral-300 rounded px-2 py-1.5 text-sm"
+                placeholder="message the agent…"
+                value={msg}
+                onChange={(e) => setMsg(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendMsg()}
+                aria-label="message to the agent"
+              />
+              <button
+                className="px-3 py-1.5 text-sm bg-neutral-900 text-white rounded hover:bg-neutral-700"
+                onClick={sendMsg}
+              >
+                Send
+              </button>
+            </div>
+            {lastAgent && (
+              <div className="mt-1 text-[11px] text-neutral-400 truncate">
+                last reply: {lastAgent.text.slice(0, 80)}
+              </div>
+            )}
+          </div>
+
+          {/* Remote repo summary — only when REPO is configured in scripts/env.sh */}
+          {status?.repo && (
+            <div className="border border-neutral-200 rounded-lg bg-white p-4 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-neutral-500">repo</span>
+                <span className="font-mono">{status.repo}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-neutral-500">main</span>
+                <span className="font-mono">{status.main_sha ?? "…"}</span>
+              </div>
+              {status.pulls && status.pulls.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">pulls</span>
+                  <span className="font-mono">
+                    {status.pulls.filter((p) => p.state === "open").length} open /{" "}
+                    {status.pulls.length} total
+                  </span>
+                </div>
+              )}
+              <div className="pt-1 border-t border-neutral-100 mt-1">
+                <div className="text-neutral-500 mt-1">branches</div>
+                <div className="max-h-40 overflow-y-auto">
+                  {status?.branches?.map((b) => (
+                    <div key={b.name} className="flex justify-between">
+                      <span className="truncate">{b.name}</span>
+                      <span className="font-mono text-neutral-500">{b.sha}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-amber-900 mb-2">Operator notes</h2>
+            <ol className="list-decimal ml-4 text-xs text-amber-900 space-y-1.5">
+              <li>
+                <b>Site login (drags stream LIVE):</b> click &quot;Sign in&quot; in the
+                replay → <b>Continue with Email</b> → click the email field → type in
+                the box below the replay (it auto-focuses the first input) → Continue →
+                password the same way. Slider/captcha: <b>press on the slider handle
+                and drag slowly</b> — the replay follows your drag in real time; release
+                when aligned. If a click ever lands wrong, toggle <b>DOM click</b> mode.
+              </li>
+              <li>
+                <b>Message the resident agent</b> through the textbox above — it reads
+                and replies while working; no login needed.
+              </li>
+              <li>
+                <b>Stale page?</b> Hard-refresh (Ctrl+Shift+R). The version badge
+                top-left must match the expected console version.
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <footer className="mt-auto border-t border-neutral-200 bg-white px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <div className="max-w-7xl mx-auto text-[11px] text-neutral-500 flex flex-wrap gap-x-4">
+          <span>Replay console — remote browser control</span>
+          <span className="ml-auto">deployed from the replay repository</span>
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

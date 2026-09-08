@@ -1,67 +1,82 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { FLAGS_DIR } from "@/lib/bridge";
+import { promises as fsp } from "fs";
+import { join } from "path";
+import { FLAGS, WATCHER_LOG } from "@/lib/replay";
+
+const INBOX = join(FLAGS, "operator_inbox.jsonl");
+const OUTBOX = join(FLAGS, "agent_outbox.jsonl");
+const HEARTBEAT = join(FLAGS, "heartbeat");
+
+type Msg = { ts: number; from: "operator" | "agent"; text: string };
+
+async function readThread(): Promise<Msg[]> {
+  const msgs: Msg[] = [];
+  for (const [path, from] of [
+    [INBOX, "operator"],
+    [OUTBOX, "agent"],
+  ] as const) {
+    try {
+      const raw = await fsp.readFile(path, "utf-8");
+      for (const line of raw.split("\n")) {
+        const t = line.trim();
+        if (!t) continue;
+        try {
+          const d = JSON.parse(t);
+          if (d && typeof d.text === "string") {
+            msgs.push({ ts: Number(d.ts) || 0, from, text: String(d.text).slice(0, 2000) });
+          }
+        } catch {
+          /* skip malformed line */
+        }
+      }
+    } catch {
+      /* file may not exist yet */
+    }
+  }
+  msgs.sort((a, b) => a.ts - b.ts);
+  return msgs;
+}
+
+export async function GET() {
+  const msgs = await readThread();
+  let agentHeartbeatMs = 0;
+  let watcherAlive = false;
+  try {
+    const st = await fsp.stat(HEARTBEAT);
+    agentHeartbeatMs = st.mtimeMs;
+  } catch {
+    /* no heartbeat yet */
+  }
+  try {
+    const st = await fsp.stat(WATCHER_LOG);
+    watcherAlive = Date.now() - st.mtimeMs < 300000;
+  } catch {
+    /* no watcher log */
+  }
+  return Response.json(
+    {
+      thread: msgs.slice(-100),
+      agent_heartbeat_ms: agentHeartbeatMs,
+      watcher_alive: watcherAlive,
+    },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+}
+
+export async function POST(req: Request) {
+  try {
+    const { text } = (await req.json()) as { text?: string };
+    const clean = (text || "").trim().slice(0, 2000);
+    if (!clean) {
+      return Response.json({ ok: false, error: "empty" }, { status: 400 });
+    }
+    await fsp.mkdir(FLAGS, { recursive: true });
+    const line = JSON.stringify({ ts: Date.now(), from: "operator", text: clean }) + "\n";
+    await fsp.appendFile(INBOX, line, "utf-8");
+    return Response.json({ ok: true });
+  } catch (e) {
+    return Response.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const OPERATOR_INBOX = path.join(FLAGS_DIR, "operator_inbox.jsonl");
-const AGENT_OUTBOX = path.join(FLAGS_DIR, "agent_outbox.jsonl");
-
-export interface ThreadMessage {
-  ts: number;
-  from: "operator" | "agent";
-  text: string;
-}
-
-async function readJsonl(file: string): Promise<ThreadMessage[]> {
-  try {
-    const txt = await fs.readFile(file, "utf8");
-    return txt
-      .split("\n")
-      .filter((l) => l.trim())
-      .map((l) => {
-        try {
-          return JSON.parse(l) as ThreadMessage;
-        } catch {
-          return null;
-        }
-      })
-      .filter((m): m is ThreadMessage => m !== null && typeof m.text === "string");
-  } catch {
-    return [];
-  }
-}
-
-/** GET /api/inbox -> merged operator+agent message thread, sorted by ts. */
-export async function GET() {
-  const [operator, agent] = await Promise.all([
-    readJsonl(OPERATOR_INBOX),
-    readJsonl(AGENT_OUTBOX),
-  ]);
-  const messages = [...operator, ...agent].sort((a, b) => (a.ts || 0) - (b.ts || 0));
-  return Response.json({ ok: true, messages });
-}
-
-/** POST /api/inbox {text} -> append operator message to operator_inbox.jsonl. */
-export async function POST(req: Request) {
-  let body: { text?: unknown };
-  try {
-    body = (await req.json()) as { text?: unknown };
-  } catch {
-    return Response.json({ ok: false, error: "invalid json" }, { status: 400 });
-  }
-  const text = typeof body.text === "string" ? body.text.trim().slice(0, 4000) : "";
-  if (!text) {
-    return Response.json({ ok: false, error: "empty text" }, { status: 400 });
-  }
-  const message: ThreadMessage = { ts: Date.now(), from: "operator", text };
-  try {
-    await fs.mkdir(FLAGS_DIR, { recursive: true });
-    await fs.appendFile(OPERATOR_INBOX, JSON.stringify(message) + "\n", "utf8");
-    return Response.json({ ok: true, message });
-  } catch (e) {
-    const message_ = e instanceof Error ? e.message : String(e);
-    return Response.json({ ok: false, error: message_ }, { status: 500 });
-  }
-}

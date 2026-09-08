@@ -59,7 +59,11 @@ server.log
 scripts/env.sh
 scripts/flags/
 scripts/browser-profile/
+scripts/logs/
+scripts/python_bin.txt
 scripts/*.pid
+scripts/*.log
+scripts/watcher.out
 scripts/xvfb.log
 scripts/browser.log
 scripts/watcher.log

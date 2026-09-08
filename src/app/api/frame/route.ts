@@ -1,26 +1,42 @@
-import { runBridgeBuffer } from "@/lib/bridge";
+import { BRIDGE, REPLAYD_URL, runBridge, timeoutSignal } from "@/lib/replay";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
-/**
- * GET /api/frame -> live JPEG screenshot of the active browser tab.
- * Binary-safe: buffer encoding end to end, no-store caching.
- */
 export async function GET() {
+  // hot path: persistent replay daemon (~90ms frames, persistent CDP conns)
   try {
-    const buf = await runBridgeBuffer(["frame"]);
-    if (!buf || buf.length < 100) {
-      return new Response(null, { status: 502 });
+    const r = await fetch(`${REPLAYD_URL}/frame`, {
+      cache: "no-store",
+      signal: timeoutSignal(9000),
+    });
+    if (r.ok) {
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength > 0) {
+        return new Response(new Uint8Array(buf), {
+          headers: {
+            "Content-Type": "image/jpeg",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+          },
+        });
+      }
+    }
+  } catch {
+    /* daemon unavailable — legacy spawn fallback below */
+  }
+  try {
+    const { stdout } = await runBridge("frame");
+    const buf = stdout as unknown as Buffer;
+    if (!buf || buf.length === 0) {
+      return new Response("", { status: 500 });
     }
     return new Response(new Uint8Array(buf), {
-      status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        "Cache-Control": "no-store",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
   } catch {
-    return new Response(null, { status: 502 });
+    return new Response("", { status: 500 });
   }
 }
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";

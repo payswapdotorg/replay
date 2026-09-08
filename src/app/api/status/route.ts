@@ -1,19 +1,15 @@
-import { runBridge } from "@/lib/bridge";
+import { runBridgeJson } from "@/lib/replay";
 
 export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
-/**
- * GET /api/status -> JSON status snapshot (processes, active tab, login
- * state, heartbeat ages) produced by `bridge.py status`.
- */
 export async function GET() {
   try {
-    const out = await runBridge(["status"]);
-    const parsed = JSON.parse(out) as Record<string, unknown>;
-    return Response.json({ ok: parsed.ok ?? true, ...parsed });
+    // bridge.py status: {ts, repo, browser_login, main_sha?, branches?, pulls?}
+    // repo is "" unless configured in scripts/env.sh — the console hides the
+    // repo card in that case.
+    const data = await runBridgeJson("status", undefined, 30000);
+    return Response.json(data);
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return Response.json({ ok: false, error: message }, { status: 502 });
+    return Response.json({ error: String(e) }, { status: 500 });
   }
 }
