@@ -179,6 +179,31 @@ def cmd_event(spec):
                 "Input.dispatchMouseEvent",
                 {"type": "mouseWheel", "x": x, "y": y, "deltaX": dx, "deltaY": dy},
             )
+        elif etype == "drag":
+            # press → interpolated moves (button held) → release; used for
+            # slider captchas and drag-and-drop targets
+            fx = int(round(float(spec.get("fromX", 0))))
+            fy = int(round(float(spec.get("fromY", 0))))
+            tx = int(round(float(spec.get("toX", 0))))
+            ty = int(round(float(spec.get("toY", 0))))
+            steps = 12
+            c.call("Input.dispatchMouseEvent", {"type": "mouseMoved", "x": fx, "y": fy})
+            c.call(
+                "Input.dispatchMouseEvent",
+                {"type": "mousePressed", "x": fx, "y": fy, "button": "left", "clickCount": 1},
+            )
+            for i in range(1, steps + 1):
+                x = fx + (tx - fx) * i // steps
+                y = fy + (ty - fy) * i // steps
+                c.call(
+                    "Input.dispatchMouseEvent",
+                    {"type": "mouseMoved", "x": x, "y": y, "button": "left", "buttons": 1},
+                )
+                time.sleep(0.02)
+            c.call(
+                "Input.dispatchMouseEvent",
+                {"type": "mouseReleased", "x": tx, "y": ty, "button": "left", "clickCount": 1},
+            )
         elif etype == "type":
             text = str(spec.get("text", ""))
             if not text:

@@ -23,6 +23,9 @@
   <button id="btn-center">CLICK ME (CENTER)</button>
   <input id="inp" placeholder="type into the page, text shows below" aria-label="test input">
   <div id="status" aria-live="polite">clicks: 0</div>
+  <div id="dragspot" style="width: 300px; height: 80px; border: 3px dashed #888;
+       display: flex; align-items: center; justify-content: center; user-select: none;
+       font-size: 14px; color: #555; touch-action: none;">drag here (press &amp; move)</div>
   <p class="hint">Buttons at top-left and bottom-left corners verify coordinate mapping.</p>
   <button id="btn-topleft">TOP-LEFT BUTTON</button>
   <button id="btn-corner">BOTTOM-LEFT BUTTON</button>
@@ -42,6 +45,21 @@
   });
   document.getElementById('inp').addEventListener('input', (e) => {
     document.getElementById('status').textContent = 'TYPED: ' + e.target.value;
+  });
+  // drag tracker: records press/move/release with coordinates
+  const spot = document.getElementById('dragspot');
+  let ds = null;
+  spot.addEventListener('mousedown', (e) => { ds = { x: e.clientX, y: e.clientY }; e.preventDefault(); });
+  window.addEventListener('mousemove', (e) => {
+    if (ds) spot.textContent = 'dragging: ' + Math.round(e.clientX) + ',' + Math.round(e.clientY);
+  });
+  window.addEventListener('mouseup', (e) => {
+    if (ds) {
+      document.getElementById('status').textContent =
+        'DRAG: ' + ds.x + ',' + ds.y + ' -> ' + Math.round(e.clientX) + ',' + Math.round(e.clientY);
+      spot.textContent = 'drag here (press & move)';
+      ds = null;
+    }
   });
 </script>
 </body>

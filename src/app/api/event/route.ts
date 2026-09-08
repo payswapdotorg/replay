@@ -12,6 +12,7 @@ const ALLOWED_TYPES = new Set([
   "scroll",
   "nav",
   "reload",
+  "drag",
 ]);
 
 interface EventSpec {
@@ -20,6 +21,10 @@ interface EventSpec {
   y?: number;
   dx?: number;
   dy?: number;
+  fromX?: number;
+  fromY?: number;
+  toX?: number;
+  toY?: number;
   text?: string;
   key?: string;
   url?: string;
@@ -46,7 +51,7 @@ export async function POST(req: Request) {
   }
 
   const spec: EventSpec = { type };
-  for (const k of ["x", "y", "dx", "dy"] as const) {
+  for (const k of ["x", "y", "dx", "dy", "fromX", "fromY", "toX", "toY"] as const) {
     if (body[k] !== undefined && body[k] !== null && Number.isFinite(Number(body[k]))) {
       spec[k] = Math.round(Number(body[k]));
     }

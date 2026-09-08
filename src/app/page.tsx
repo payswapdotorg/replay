@@ -234,17 +234,45 @@ export default function OperatorConsole() {
   );
 
   /**
-   * CRITICAL: click coordinates are mapped with the image's naturalWidth /
-   * naturalHeight — NEVER hardcoded viewport numbers. The real viewport
-   * (e.g. 1439x756) differs from the requested window size (1440x900).
+   * CRITICAL: click/drag coordinates are mapped with the image's
+   * naturalWidth / naturalHeight — NEVER hardcoded viewport numbers. The real
+   * viewport (e.g. 1439x756) differs from the requested window size (1440x900).
+   * Press-drag-release sends a drag event (slider captchas); a press-release
+   * under 6px sends a click.
    */
-  const onFrameClick = (e: React.MouseEvent<HTMLImageElement>) => {
+  const dragStartRef = useRef<{ vx: number; vy: number; cx: number; cy: number } | null>(null);
+
+  const toViewport = (img: HTMLImageElement, e: React.MouseEvent<HTMLImageElement>) => ({
+    x: Math.round(((e.clientX - img.getBoundingClientRect().left) / img.getBoundingClientRect().width) * img.naturalWidth),
+    y: Math.round(((e.clientY - img.getBoundingClientRect().top) / img.getBoundingClientRect().height) * img.naturalHeight),
+  });
+
+  const onFrameMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
-    const rect = img.getBoundingClientRect();
-    if (!img.naturalWidth || !img.naturalHeight || rect.width === 0) return;
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * img.naturalWidth);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * img.naturalHeight);
-    sendEvent({ type: "click", x, y });
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    const v = toViewport(img, e);
+    dragStartRef.current = { vx: v.x, vy: v.y, cx: e.clientX, cy: e.clientY };
+  };
+
+  const onFrameMouseUp = (e: React.MouseEvent<HTMLImageElement>) => {
+    const start = dragStartRef.current;
+    dragStartRef.current = null;
+    if (!start) return;
+    const img = e.currentTarget;
+    if (!img.naturalWidth || !img.naturalHeight) return;
+    const end = toViewport(img, e);
+    const dist = Math.hypot(e.clientX - start.cx, e.clientY - start.cy);
+    if (dist < 6) {
+      sendEvent({ type: "click", x: end.x, y: end.y });
+    } else {
+      sendEvent({
+        type: "drag",
+        fromX: start.vx,
+        fromY: start.vy,
+        toX: end.x,
+        toY: end.y,
+      });
+    }
   };
 
   const selectTab = useCallback(
@@ -340,7 +368,7 @@ export default function OperatorConsole() {
               Operator Console
             </h1>
             <p className="truncate text-xs text-muted-foreground">
-              Resident agent · live browser replay · click the screenshot to interact
+              Resident agent · live browser replay · click the screenshot to interact, drag for sliders
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -407,13 +435,16 @@ export default function OperatorConsole() {
               <div className="relative overflow-hidden rounded-md border bg-muted/60">
                 {frameUrl ? (
                   <img
-                    ref={undefined}
                     src={frameUrl}
                     alt="Live screenshot of the resident agent's browser"
-                    onClick={onFrameClick}
+                    onMouseDown={onFrameMouseDown}
+                    onMouseUp={onFrameMouseUp}
+                    onMouseLeave={() => {
+                      dragStartRef.current = null;
+                    }}
                     draggable={false}
                     className="block w-full cursor-crosshair select-none"
-                    aria-label="Browser replay screenshot; click to interact with the page"
+                    aria-label="Browser replay screenshot; click to interact, drag for sliders"
                   />
                 ) : (
                   <Skeleton className="aspect-[1440/756] w-full" />
@@ -591,7 +622,7 @@ export default function OperatorConsole() {
           </span>
           <span>{tabs.length} tab{tabs.length === 1 ? "" : "s"}</span>
           <span>agent active {ageLabel(status?.agentActiveAgo)}</span>
-          <span className="ml-auto">clicks map via image natural size · never hardcoded</span>
+          <span className="ml-auto">clicks &amp; drags map via image natural size · never hardcoded</span>
         </div>
       </footer>
     </div>
