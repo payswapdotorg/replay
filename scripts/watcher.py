@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import channel  # noqa: E402
 from procs import (  # noqa: E402
+    TARGET_URL,
     chrome_up,
     dev_up,
     ensure_dirs,
@@ -152,10 +153,19 @@ def log_operator_messages():
 
 
 def session_registry(tabs):
+    """Track tabs belonging to the target site ($TARGET_URL, chat.z.ai default)."""
+    from urllib.parse import urlparse
+
+    try:
+        host = urlparse(TARGET_URL).host or urlparse(TARGET_URL).netloc
+    except Exception:
+        host = "chat.z.ai"
+    if not host:
+        host = "chat.z.ai"
     chat = [
         {"id": t.get("id"), "title": (t.get("title") or "")[:80], "url": t.get("url", "")}
         for t in tabs
-        if "chat.z.ai" in t.get("url", "")
+        if host in t.get("url", "")
     ]
     if chat:
         prev = _read_json(REGISTRY, {"knownUrls": []})
@@ -167,7 +177,7 @@ def session_registry(tabs):
             {"ts": int(time.time() * 1000), "sessions": chat, "knownUrls": sorted(urls)},
         )
         if len(chat) > 3:
-            log(f"chat.z.ai session count = {len(chat)} (> 3) — trim recommended")
+            log(f"target-site session count = {len(chat)} (> 3) — trim recommended")
 
 
 def cycle():

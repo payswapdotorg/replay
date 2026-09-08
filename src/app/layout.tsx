@@ -14,24 +14,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "Replay — Live Browser Control Console",
+  description:
+    "Drive a real headless-display Chrome from a web page: live screenshot replay, click/type/scroll/drag forwarding, tab management, and an operator-to-agent message thread. Built with Next.js, CDP, Xvfb.",
+  keywords: [
+    "browser replay",
+    "CDP",
+    "Chrome DevTools Protocol",
+    "Xvfb",
+    "remote browser",
+    "operator console",
+    "Next.js",
+  ],
+  authors: [{ name: "payswap" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "Replay — Live Browser Control Console",
+    description: "Live browser replay and control from a single web page",
+    url: "https://github.com/payswapdotorg/replay",
+    siteName: "Replay",
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    card: "summary",
+    title: "Replay — Live Browser Control Console",
+    description: "Live browser replay and control from a single web page",
   },
 };
 

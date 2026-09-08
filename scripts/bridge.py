@@ -22,7 +22,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import channel  # noqa: E402
-from procs import FLAGS, chrome_up, dev_up, ensure_dirs, xvfb_up  # noqa: E402
+from procs import (  # noqa: E402
+    FLAGS,
+    TARGET_URL,
+    chrome_up,
+    dev_up,
+    ensure_dirs,
+    xvfb_up,
+)
 
 ACTIVE_TAB_FILE = os.path.join(FLAGS, "active_tab.txt")
 HEARTBEAT = os.path.join(FLAGS, "heartbeat")
@@ -309,6 +316,7 @@ def cmd_status():
         "xvfb": xvfb_up(),
         "chrome": chrome_up(),
         "dev": dev_up(),
+        "targetUrl": TARGET_URL,
         "tabCount": len(tabs),
         "active": (
             {"id": active.get("id"), "title": (active.get("title") or "")[:80],

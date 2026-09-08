@@ -33,6 +33,7 @@ interface StatusInfo {
   xvfb?: boolean;
   chrome?: boolean;
   dev?: boolean;
+  targetUrl?: string;
   tabCount?: number;
   active?: { id: string; title: string; url: string } | null;
   login?: string;
@@ -337,6 +338,8 @@ export default function OperatorConsole() {
   }, [typeInput, refreshFrame]);
 
   const activeUrl = status?.active?.url ?? tabs.find((t) => t.id === activeTab)?.url ?? "";
+  const targetUrl = status?.targetUrl || "https://chat.z.ai/";
+  const targetHost = hostOf(targetUrl);
   const frameAge = frameTs ? Math.max(0, Math.round((Date.now() - frameTs) / 1000)) : null;
   const loginBadge =
     status?.login === "signed-in" ? (
@@ -365,10 +368,10 @@ export default function OperatorConsole() {
           </span>
           <div className="mr-auto min-w-0">
             <h1 className="truncate text-base font-semibold leading-tight sm:text-lg">
-              Operator Console
+              Replay Console
             </h1>
             <p className="truncate text-xs text-muted-foreground">
-              Resident agent · live browser replay · click the screenshot to interact, drag for sliders
+              Live browser replay · click the screenshot to interact, drag for sliders · operator ⇄ agent thread
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -421,7 +424,7 @@ export default function OperatorConsole() {
                   >
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
-                        t.url.includes("chat.z.ai") ? "bg-emerald-500" : "bg-muted-foreground/50"
+                        t.url.includes(targetHost) ? "bg-emerald-500" : "bg-muted-foreground/50"
                       }`}
                       aria-hidden="true"
                     />
@@ -475,8 +478,8 @@ export default function OperatorConsole() {
                 <Button variant="outline" className="h-10" onClick={() => sendEvent({ type: "reload" })}>
                   <RotateCw className="mr-1.5 h-4 w-4" aria-hidden="true" /> Reload
                 </Button>
-                <Button variant="outline" className="h-10" onClick={() => sendEvent({ type: "nav", url: "https://chat.z.ai/" })}>
-                  <Globe className="mr-1.5 h-4 w-4" aria-hidden="true" /> chat.z.ai
+                <Button variant="outline" className="h-10" onClick={() => sendEvent({ type: "nav", url: targetUrl })}>
+                  <Globe className="mr-1.5 h-4 w-4" aria-hidden="true" /> {targetHost}
                 </Button>
                 <span className="ml-auto max-w-full truncate text-xs text-muted-foreground" aria-live="polite">
                   {lastAction}

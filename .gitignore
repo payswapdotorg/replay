@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files: .env is tracked (no secrets — sandbox-standard DATABASE_URL);
+# secret/local overrides stay out of git
+.env.local
+.env.*.local
 
 # vercel
 .vercel
@@ -62,3 +64,10 @@ scripts/xvfb.log
 scripts/browser.log
 scripts/watcher.log
 scripts/watcher_stdout.log
+scripts/__pycache__/
+
+# runtime database + dev server pid (created by scripts/bootstrap.sh)
+db/
+.zscripts/dev.pid
+# session-local resident agent worklog
+worklog.md

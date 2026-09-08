@@ -17,6 +17,24 @@ from websocket import create_connection  # websocket-client
 HTTP = "http://127.0.0.1:9222"
 
 
+def _preferred_hosts():
+    """Hosts that win tab-selection priority: $TARGET_URL's host, then z.ai."""
+    hosts = []
+    import os
+
+    target = os.environ.get("TARGET_URL", "https://chat.z.ai/")
+    try:
+        from urllib.parse import urlparse
+
+        h = urlparse(target).host or urlparse(target).netloc
+        if h:
+            hosts.append(h)
+    except Exception:
+        pass
+    hosts.append("chat.z.ai")
+    return hosts
+
+
 def _http_json(path, method="GET", timeout=5):
     req = urllib.request.Request(HTTP + path, method=method)
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -46,7 +64,8 @@ def new_tab(url):
 
 
 def find_tab(pattern=None, tabs=None):
-    """Match URL substring; else prefer chat.z.ai; else first tab."""
+    """Match URL substring; else prefer the target site (chat.z.ai by default);
+    else first tab."""
     tabs = list_tabs() if tabs is None else tabs
     if not tabs:
         return None
@@ -54,9 +73,10 @@ def find_tab(pattern=None, tabs=None):
         for t in tabs:
             if pattern in t.get("url", "") or pattern in t.get("title", ""):
                 return t
-    for t in tabs:
-        if "chat.z.ai" in t.get("url", ""):
-            return t
+    for host in _preferred_hosts():
+        for t in tabs:
+            if host in t.get("url", ""):
+                return t
     return tabs[0]
 
 

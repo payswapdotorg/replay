@@ -4,21 +4,59 @@
 Manages: Xvfb (:99), Chrome for Testing (CDP on 127.0.0.1:9222, persistent
 profile), and the Next.js dev server (port 3000). All processes are started
 detached (start_new_session=True) with pid files + logs under scripts/.
+
+Environment overrides (all optional):
+  TARGET_URL   default page opened in Chrome (default https://chat.z.ai/)
+  CHROME_BIN   absolute path to a Chrome/Chromium binary
+  Xvfb display is fixed at :99 and the CDP port at 9222.
 """
+import glob
 import os
+import shutil
 import subprocess
 import time
 import urllib.request
 
-ROOT = "/home/z/my-project"
-SCRIPTS = os.path.join(ROOT, "scripts")
+SCRIPTS = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(SCRIPTS)
 FLAGS = os.path.join(SCRIPTS, "flags")
 PROFILE = os.path.join(SCRIPTS, "browser-profile")
-CHROME_BIN = "/home/z/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome"
-PYTHON = "/home/z/.venv/bin/python3"
+TARGET_URL = os.environ.get("TARGET_URL", "https://chat.z.ai/")
 XVFB_DISPLAY = ":99"
 CDP_PORT = 9222
 DEV_URL = "http://127.0.0.1:3000/"
+
+
+def _detect_chrome():
+    """Find a usable Chrome binary, tolerating playwright cache version drift.
+
+    Order: $CHROME_BIN -> playwright cache glob (newest first) -> PATH.
+    """
+    override = os.environ.get("CHROME_BIN")
+    if override and os.path.exists(override):
+        return override
+    patterns = [
+        "/home/z/.cache/ms-playwright/chromium-*/chrome-linux*/chrome",
+        os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome"),
+        "/usr/bin/google-chrome*",
+        "/usr/bin/chromium*",
+    ]
+    for pat in patterns:
+        matches = sorted(glob.glob(pat), reverse=True)
+        for m in matches:
+            if os.access(m, os.X_OK):
+                return m
+    for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return None  # callers report a clean error instead of crashing at import
+
+
+CHROME_BIN = _detect_chrome()
+PYTHON = "/home/z/.venv/bin/python3"
+if not os.path.exists(PYTHON):
+    PYTHON = shutil.which("python3") or "python3"
 
 
 def ensure_dirs():
@@ -100,14 +138,19 @@ def chrome_up():
         return False
 
 
-def start_chrome(url="https://chat.z.ai/"):
+def start_chrome(url=None):
     """Start headed Chrome under Xvfb with CDP on 127.0.0.1:9222.
 
     Persistent user-data-dir means operator login survives restarts.
+    The landing URL defaults to $TARGET_URL (https://chat.z.ai/).
     Returns the pid.
     """
     if chrome_up():
         return read_pid("browser")
+    if not CHROME_BIN:
+        raise RuntimeError(
+            "no Chrome/Chromium binary found; set CHROME_BIN or install playwright chromium"
+        )
     ensure_dirs()
     if not xvfb_up():
         start_xvfb()
@@ -128,7 +171,7 @@ def start_chrome(url="https://chat.z.ai/"):
                 "--disable-dev-shm-usage",
                 "--hide-crash-restore-bubble",
                 "--window-size=1440,900",
-                url,
+                url or TARGET_URL,
             ],
             stdout=log,
             stderr=subprocess.STDOUT,
