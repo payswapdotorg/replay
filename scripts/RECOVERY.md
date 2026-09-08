@@ -30,9 +30,10 @@ sleep 5 && curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/   # e
 # 2. Xvfb + Chrome
 /home/z/.venv/bin/python3 scripts/start_stack.py
 
-# 3. watcher (detached)
-setsid /home/z/.venv/bin/python3 scripts/watcher.py >> scripts/watcher_stdout.log 2>&1 < /dev/null &
-sleep 1; pgrep -f "scripts/watcher.py" > scripts/watcher.pid
+# 3. watcher (detached, self-healing wrapper — plain `setsid ... &` from a
+#    shell dies silently in this sandbox; the Popen+start_new_session pattern
+#    that Chrome/Xvfb use is the proven one)
+/home/z/.venv/bin/python3 scripts/start_watcher.py
 
 # 4. heartbeat + sanity checks
 touch scripts/flags/heartbeat

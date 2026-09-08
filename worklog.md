@@ -134,3 +134,16 @@ Work Log:
 
 Stage Summary:
 - Resident loop active; waiting on operator login before §4 chat.z.ai session work can proceed.
+
+---
+Task ID: 10
+Agent: resident-agent (main)
+Task: Fix silent watcher death; harden daemon supervision
+
+Work Log:
+- Symptom: watcher started via `setsid ... &` from a shell wrote its first cycle, then died silently within 60s (no traceback, no cycle error). Chrome/Xvfb launched via Python Popen(start_new_session=True) survived fine.
+- Fix: scripts/start_watcher.py — Popen(start_new_session=True) running a `while true` sh wrapper that (re)starts watcher.py and logs exits to watcher.log; wrapper pid in scripts/watcher.pid. If the python watcher ever dies, the wrapper restarts it in 5s.
+- Verified: heartbeat advanced 19:18:58 → 19:19:59 (cycle 2 completed), process alive; RECOVERY.md cold-start sequence updated to use start_watcher.py.
+
+Stage Summary:
+- Watchdog is now self-healing and confirmed cycling every 60s.
