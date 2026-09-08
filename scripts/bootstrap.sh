@@ -52,6 +52,7 @@ if [ "$INSTALL_DIR" != "$REPO_ROOT" ]; then
     --exclude 'worklog.md' \
     --exclude 'tests/' \
     --exclude 'skills/' \
+    --exclude 'upload/' \
     "$REPO_ROOT"/ "$INSTALL_DIR"/
 fi
 cd "$INSTALL_DIR"
