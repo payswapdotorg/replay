@@ -44,10 +44,14 @@ if [ "$INSTALL_DIR" != "$REPO_ROOT" ]; then
     --exclude '.next/' \
     --exclude 'scripts/browser-profile/' \
     --exclude 'scripts/flags/' \
+    --exclude 'scripts/env.sh' \
     --exclude 'scripts/*.log' \
     --exclude 'scripts/*.pid' \
     --exclude 'db/' \
     --exclude 'dev.log' \
+    --exclude 'worklog.md' \
+    --exclude 'tests/' \
+    --exclude 'skills/' \
     "$REPO_ROOT"/ "$INSTALL_DIR"/
 fi
 cd "$INSTALL_DIR"
