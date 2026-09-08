@@ -147,3 +147,35 @@ Work Log:
 
 Stage Summary:
 - Watchdog is now self-healing and confirmed cycling every 60s.
+
+---
+Task ID: 11
+Agent: resident-agent (main)
+Task: Drag support for slider CAPTCHAs + operator notification
+
+Work Log:
+- Found chat.z.ai showing a slider security verification over its login page — clicks alone cannot solve it.
+- bridge.py: new `drag` event (mousePressed → 12 interpolated mouseMoved with button held, 20ms spacing → mouseReleased).
+- /api/event: `drag` whitelisted; fromX/fromY/toX/toY sanitized as integers.
+- page.tsx: replay img now uses onMouseDown/onMouseUp — press-drag-release (≥6px) sends drag, small movement sends click; coordinates still mapped via naturalWidth/naturalHeight. Hint texts updated.
+- testpage.html: drag tracker element added for calibration.
+- E2E verified via agent-browser synthetic mouse events: drag recorded "DRAG: 610,443 -> 818,443" (pixel-exact); click path still works ("TOP-LEFT HIT"); lint clean.
+- Operator notified via agent_outbox about the CAPTCHA and drag capability.
+
+Stage Summary:
+- The operator can now solve slider captchas and log into chat.z.ai entirely through the replay panel.
+
+---
+Task ID: 12
+Agent: resident-agent (main)
+Task: Resident loop active — final state snapshot
+
+Work Log:
+- Final verification round: console live (frame 1439x756 polling 2.5s), zero page errors, zero dev.log errors, lint clean.
+- Watcher cycling on schedule (heartbeats 19:18:58 → 19:22:59+); self-healing wrapper armed.
+- Operator inbox: watermark 2/2 — no new operator messages yet; two agent replies posted (greeting + CAPTCHA/drag instructions).
+- chat.z.ai state: signed-out, slider security verification over login page; drag support added and E2E verified so the operator can solve it through the replay.
+- Heartbeat fresh; all work committed to local git (3 commits).
+
+Stage Summary:
+- System fully operational; §4 chat.z.ai session work starts as soon as the operator logs in via the replay panel.
