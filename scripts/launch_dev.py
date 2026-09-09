@@ -14,7 +14,7 @@ ROOT = os.path.dirname(BASE)
 PORT = os.environ.get("REPLAY_PORT", "3000")
 
 env = dict(os.environ)
-env.setdefault("NODE_OPTIONS", "--max-old-space-size=1536")
+env["NODE_OPTIONS"] = "--max-old-space-size=1024"  # FORCE: setdefault silently drops the cap if NODE_OPTIONS is preset
 p = subprocess.Popen(["bun", "run", "dev", "--", "-p", PORT],
     stdout=open(os.path.join(BASE, "dev.log"), "w"), stderr=subprocess.STDOUT,
     start_new_session=True, cwd=ROOT, env=env)

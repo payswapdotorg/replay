@@ -33,6 +33,9 @@ Next.js console :3000  (/) ── frame/event/tabs/status/inbox routes proxy to
 - `scripts/dispatch_worker.py` — create named chat sessions in the browser
   (new tab → navigate → type prompt → Enter → verify in DOM) and check them.
   Useful for dispatching work to AI chat sessions living inside the replay.
+  Sessions are created in the **agents tab** with model **GLM-5.3** and skill
+  **Full-Stack**, hard-verified at every step (see "Worker dispatch toolkit"
+  below).
 
 ## Deploy (fresh sandbox)
 
@@ -111,3 +114,51 @@ follows it live.
 (pointerdown → held moves → pointerup) against a data-URL test page and
 asserts the events landed — proves drag streaming before you trust it with a
 captcha.
+
+## Worker dispatch toolkit (agents-tab sessions)
+
+The scripts that drive AI worker sessions inside the replay browser. All state
+lives in `scripts/flags/session_registry.jsonl` (gitignored).
+
+```bash
+python3 scripts/dispatch_worker.py create <name> <prompt-file.md>
+    # agents tab + GLM-5.3 + Full-Stack, every step hard-verified; refuses to
+    # send unless all three selections stick. Idempotent bounded insert (a
+    # half-sent prompt never double-inserts). Handles the sandbox-concurrency
+    # modal by releasing sandboxes with no active job. On GLM-5.3 capacity it
+    # NEVER clicks Cancel (that destroys new-task sessions) — it stages the
+    # send for the recovery poller and writes flags/capacity_recover.json.
+python3 scripts/dispatch_worker.py check <name>     # transcript tail + state
+python3 scripts/dispatch_worker.py send <name> <msg | @file>
+    # continuation message — recovers a stalled turn (worker stopped mid-task)
+python3 scripts/dispatch_worker.py done <name> [note]
+    # mark completed + close the tab (frees the concurrency slot)
+python3 scripts/dispatch_worker.py void <name> <reason>
+    # nullify a bad session (wrong tab/model/skill) + close the tab
+python3 scripts/dispatch_worker.py list             # registry overview
+python3 scripts/dispatch_worker.py models           # model selector options
+python3 scripts/dispatch_worker.py sandboxes        # inspect/release sandboxes
+```
+
+**Capacity ride-out**: `scripts/recover_capacity.py <session-uuid>` polls once
+a minute without touching Cancel and re-sends from the composer draft when
+capacity clears; the supervisor keeps this poller alive while
+`flags/capacity_recover.json` exists (relaunches it if it dies).
+
+**Harvesting worker output**:
+- `python3 scripts/extract_full.py <name>` — full transcript extraction from
+  the session page: scroll-sweep over virtualized turns, expands "Show full
+  message", parses fenced file blocks out of the final report.
+- `python3 scripts/harvest_report.py <name>` — registry-aware report harvest
+  (finds the session's tab even after tab-reopen events).
+
+**Prompt generation** (for work-order-driven programs):
+- `python3 scripts/build_prompt.py <WO-ID> <repo-path> <base-sha>` — builds a
+  self-contained worker prompt (contract + task packet + source bundle:
+  verbatim boundary files, signatures for the rest) into
+  `scripts/worker-prompts/`.
+- `python3 scripts/build_audit_prompts.py [repo-path]` — builds audit prompts
+  (verify a merged implementation against its work order).
+
+See `AGENT_BOOT_PROMPT.md` for the full operating protocol (failure ladder,
+resident duties, dispatch rules).

@@ -148,10 +148,17 @@ def check_procs():
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{CONSOLE_PORT}", timeout=4).read(64)
         except Exception:
-            log(f"dev server :{CONSOLE_PORT} dead — restarting")
-            subprocess.Popen([py, os.path.join(BASE, "launch_dev.py")],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(5)
+            # liveness-guarded: a cold compile binds the port late; spawning
+            # extra dev servers during that window stampedes memory (OOM).
+            # The supervisor owns the patience/restart policy — we only spawn
+            # when no dev process exists at all.
+            r = subprocess.run(["pgrep", "-f", "next dev|bun run dev|next-server"],
+                               capture_output=True, text=True)
+            if not r.stdout.strip():
+                log(f"dev server :{CONSOLE_PORT} dead — restarting")
+                subprocess.Popen([py, os.path.join(BASE, "launch_dev.py")],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(5)
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{REPLAYD_PORT}/healthz", timeout=3).read(64)
         except Exception:

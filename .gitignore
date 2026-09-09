@@ -64,6 +64,10 @@ scripts/python_bin.txt
 scripts/*.pid
 scripts/*.log
 scripts/watcher.out
+
+# program scratch (generated per-deployment by build_prompt/harvest)
+scripts/worker-prompts/
+scripts/worker-reports/
 scripts/xvfb.log
 scripts/browser.log
 scripts/watcher.log

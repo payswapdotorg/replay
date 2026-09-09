@@ -33,8 +33,9 @@ function resolvePython(): string {
 }
 
 /** Lazily resolved interpreter: deploy.sh may write python_bin.txt AFTER the
- * console is already running, so resolving once at module load can pin a
- * wrong "python3" fallback for the whole server lifetime. */
+ * console is already running (e.g. a platform-managed dev server), so
+ * resolving once at module load can pin a wrong "python3" fallback for the
+ * whole server lifetime. */
 export function pyBin(): string {
   return resolvePython();
 }
