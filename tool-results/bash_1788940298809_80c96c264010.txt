@@ -1,0 +1,261 @@
+# Zeck — Stateless AI Continuation Contract
+
+This repository is designed to be recoverable by a fresh LLM Architect, Tech Lead or implementation session without conversation history. Repository artifacts, Git history and live GitHub state are authoritative.
+
+## Canonical remote
+
+`payswapdotorg/Zeck` is the canonical remote for Zeck product development. `pectoraux/Zeck` is historical upstream/reference only.
+
+## Current authoritative handoff
+
+Read `docs/LLM-ARCHITECT-HANDOFF.md` immediately after `AGENTS.md`.
+For dispatch/review/orchestration behavior also read:
+
+- `docs/LLM-TECH-LEAD-BOOTSTRAP.md`
+- `docs/LLM-TECH-LEAD-CONTRACT.md`
+- `docs/E1.1-IMPLEMENTATION-PROGRAM.md`
+- `docs/E1.1-RESEARCH-BASELINE.md`
+
+## Current continuation pointer
+
+- Core Architecture v1.0: frozen after approval.
+- Deployment/runtime Architecture D1.0: approved and subordinate to v1.0.
+- Execution Intelligence Architecture E1.0: approved by ACR-003/ADR-0019 and subordinate to v1.0.
+- Economic Execution Intelligence E1.1: approved by ACR-004/ADR-0020 and subordinate to v1.0/E1.0.
+- UX v2: complete through WORK-041.
+- D-00 through D-06: complete.
+- D-07 / WORK-048: authorized through Issue #13.
+
+Current frontier remains `eligible=["WORK-048"]`, `inFlight=[]`, `blocked=[]`.
+
+## E1.1 architectural authority
+
+E1.1 is a refinement of E1.0, not a new independent platform generation. The single `Execution Compiler` is the optimization authority.
+
+It optimizes the expected cost of successfully resolving a governed outcome while preserving hard quality, reliability, policy, capability, budget, tenant, verification, safety and side-effect constraints.
+
+Do not create independent core authorities for model routing, tool routing, context optimization, cache optimization, agent optimization, sandbox optimization, retry optimization or cost optimization.
+
+## E1.1 implementation charter
+
+`docs/E1.1-IMPLEMENTATION-PROGRAM.md` is the exact post-D-07 implementation charter.
+
+```text
+WORK-048
+  ↓
+WORK-049 → WORK-050
+              ├─ WORK-051
+              ├─ WORK-052
+              ├─ WORK-053
+              └─ WORK-054
+                    ↓
+                 WORK-055
+                    ↓
+                 WORK-056
+```
+
+Future stages become executable only when the Architect issues repository Work Orders and dependency/frontier state authorizes them. The charter is not permission to invent implementation work.
+
+## Three-worker rule
+
+A fresh Tech Lead may dispatch at most **3 concurrent implementation workers**.
+
+Parallelism requires live conflict analysis over dependencies, source surfaces, migrations, public contracts, tests, package/toolchain/configuration, provider manifests and architecture/governance artifacts.
+
+Workers do not modify `spec/development-state/*` during implementation and never merge their own PRs.
+
+## No implementation drift
+
+Stop and request Architect amendment whenever implementation would require:
+
+- a new authority, durable state source, ledger, state machine or cache authority;
+- a frozen v1.0 invariant change;
+- a change to the E1.1 objective or Execution Compiler role;
+- provider-specific semantics entering domain modules;
+- weaker assurance;
+- undocumented dependency/scope expansion;
+- dishonest evidence substitution for unavailable infrastructure.
+
+## Provider/substrate rule
+
+E2B, Daytona, Modal and future compute vendors are neutral substrate adapters. Provider snapshots, warm pools, directory snapshots, readiness probes, scheduling and provider-local state remain mechanisms rather than Zeck authorities.
+
+## Current deployment authority
+
+`WORK-048` remains the only executable deployment work until completion.
+
+Required branch: `work/WORK-048-resilience-disaster-recovery-provider-exit`.
+
+The branch is currently identical to canonical `main`, so the next worker can establish an exact base with no stale pre-dispatch documentation.
+
+## Recovery sequence
+
+1. `AGENTS.md`
+2. `AI_CONTINUATION.md`
+3. `docs/LLM-ARCHITECT-HANDOFF.md`
+4. `docs/LLM-TECH-LEAD-BOOTSTRAP.md`
+5. `docs/LLM-TECH-LEAD-CONTRACT.md`
+6. `docs/E1.1-IMPLEMENTATION-PROGRAM.md`
+7. `docs/E1.1-RESEARCH-BASELINE.md`
+8. README/IMPLEMENTATION/worker and architect runbooks
+9. architecture + lock
+10. requirements + traceability
+11. all development-state JSON
+12. relevant ADRs/ACRs and Work Orders
+13. live GitHub refs/PRs/issues/checks
+14. `python3 scripts/governance-check.py`
+
+## Fresh-session invariant
+
+A fresh LLM Tech Lead must recover the current architecture, frontier, Work Order authority, three-worker concurrency ceiling, E1.1 implementation sequence, provider boundary, evidence rules and merge/finalization protocol entirely from repository artifacts and live GitHub state.
+=====development-state files=====
+--- spec/development-state/checkpoint-state.json ---
+{
+  "schemaVersion": 1,
+  "items": {
+    "WORK-001": {
+      "asOf": "2026-08-30T03:56:00Z",
+      "branch": "work/WORK-001-foundation",
+      "baseRevision": "463e6a677630cdc3cae5914abc01aafdd154c795",
+      "assuranceProfile": "CRITICAL",
+      "outcomes": {
+        "IMPLEMENTATION-COMPLETENESS": {"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-001.md","tests/integration/toolchain-contract.test.ts","tests/architecture/module-skeleton.test.ts"]},
+        "IDENTITY-IDEMPOTENCY": {"status":"scope-note","verdict":"passed","evidence":["docs/work-items/WORK-001.md#checkpoint-evidence"]},
+        "CONCURRENCY-CRASH-SAFETY": {"status":"scope-note","verdict":"passed","evidence":["docs/work-items/WORK-001.md#checkpoint-evidence"]},
+        "SELF-HOSTING-BOUNDARY": {"status":"evidence-recorded","verdict":"passed","evidence":["tests/discrimination/governance-gate.discrimination.test.ts","tests/integration/fresh-clone-governance.test.ts"]},
+        "DEPENDENCY-DIRECTION": {"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/dependency-direction.test.ts","tests/architecture/provider-sdk-boundaries.test.ts","tests/architecture/module-skeleton.test.ts","tests/discrimination/dependency-rules.discrimination.test.ts"]}
+      }
+    },
+    "WORK-002": {
+      "asOf":"2026-08-30T06:24:12Z","branch":"work/WORK-002-identity-tenants","baseRevision":"f5b7d6cd59af1c9d31b82ccc3de36f02b5f5b749","assuranceProfile":"CRITICAL","mergedAs":{"pr":4,"mergeCommit":"7b9cf363ff089da6b106ac35879263a6ace7e36e","implementationHead":"a0a17bfc89192e3e6b06b1c25e9452787f5d29df","finalBranchHead":"c79e86a097e58ce21a3234105e9d1b85e4154f75"},
+      "outcomes": {
+        "IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-002.md","tests/integration/postgres/ownership.test.ts","tests/integration/postgres/tenant-isolation.test.ts"]},
+        "IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/idempotency.test.ts","tests/integration/postgres/schema-constraints.test.ts","tests/discrimination/tenant-isolation.discrimination.test.ts"]},
+        "CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/idempotency.test.ts","tests/integration/postgres/migration-runner.test.ts","tests/integration/postgres/owner-retention-concurrency.test.ts"]},
+        "SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/dependency-direction.test.ts","tests/discrimination/governance-gate.discrimination.test.ts","docs/work-items/WORK-002.md"]}
+      }
+    },
+    "WORK-003": {
+      "asOf":"2026-08-30T07:55:00Z","branch":"work/WORK-003-connections-federation","baseRevision":"8d9b9936fe79f1ab972137c0f1732c729461a41b","assuranceProfile":"HIGH_ASSURANCE","mergedAs":{"pr":6,"mergeCommit":"8cdc07f21a763469042c75af6cea3ec71c3cb8fb8","implementationHead":"d8f40cdaead6ddd7174b546b18de9f6166868c0c","finalBranchHead":"9962d2dd13cc1dc876f07f76eb31144a14456bac"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-003.md","tests/integration/postgres/model-dispatch.test.ts","tests/unit/models/openrouter-normalization.test.ts","tests/unit/models/anthropic-normalization.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/connections-persistence.test.ts","tests/unit/connections/connection-service.test.ts"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/connections-persistence.test.ts","tests/integration/postgres/dispatch-journal.test.ts","tests/integration/postgres/transport-failure-durability.test.ts"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/provider-neutrality.test.ts","tests/discrimination/provider-isolation.discrimination.test.ts","docs/work-items/WORK-003.md"]}}
+    },
+    "WORK-004": {
+      "asOf":"2026-08-30T10:10:00Z","branch":"work/WORK-004-budgets-ledger","baseRevision":"82afe972f1a5774a099fbac3114a15efb3f3dafa","assuranceProfile":"CRITICAL","mergedAs":{"pr":7,"mergeCommit":"cf1d8dd5f60a75687e9c028cea36101a7655c5bb","implementationHead":"5b1ce97be55f64e0c906ea745324896eb0e7322e","finalBranchHead":"b865e7179f045e69d29c6368ce65d8c7ce4f7607"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-004.md","tests/integration/postgres/budgets-schema.test.ts","tests/integration/postgres/budgets-reservations.test.ts","tests/unit/budgets/budget-service.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/budgets-reservations.test.ts","tests/integration/postgres/budgets-concurrency.test.ts","tests/discrimination/budgets-settlement.discrimination.test.ts"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/budgets-concurrency.test.ts","tests/discrimination/budgets-overspend.discrimination.test.ts","tests/integration/postgres/budgets-reservations.test.ts"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/dependency-direction.test.ts","tests/discrimination/budgets-settlement.discrimination.test.ts","docs/work-items/WORK-004.md"]}}
+    },
+    "WORK-005": {
+      "asOf":"2026-08-30T10:10:00Z","branch":"work/WORK-005-capability-registry","baseRevision":"82afe972f1a5774a099fbac3114a15efb3f3dafa","assuranceProfile":"HIGH_ASSURANCE","mergedAs":{"pr":8,"mergeCommit":"d9159a0ac9b3c8cd7be60e1594fb661d5356501f","implementationHead":"20953d43596df0aa7acd203a7085d6b6237a613c","finalBranchHead":"1ac768d6fa9aff0addb08386b4e7bac8b46ea418"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-005.md","tests/unit/capabilities/capability-registry.test.ts","tests/unit/capabilities/capability-resolution.test.ts","tests/unit/models/capability-gateway.test.ts","tests/unit/models/rail-capability-facts.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/unit/capabilities/capability-registry.test.ts","docs/work-items/WORK-005.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/unit/capabilities/capability-registry.test.ts","docs/work-items/WORK-005.md"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/capability-order.test.ts","tests/architecture/provider-neutrality.test.ts","tests/discrimination/capability-vocabulary-neutrality.discrimination.test.ts","tests/discrimination/capability-before-route.discrimination.test.ts","tests/discrimination/capability-registry-authority.discrimination.test.ts","docs/work-items/WORK-005.md"]}}
+    },
+    "WORK-006": {
+      "asOf":"2026-08-30T11:24:00Z","branch":"work/WORK-006-execution-lifecycle","baseRevision":"d4d1e6a6afb9c043517b6858befc290e7dd1cc0d","assuranceProfile":"CRITICAL","mergedAs":{"pr":10,"mergeCommit":"593ecc2151b7eee584b930f3166e53bc77484749","implementationHead":"8f0e106f6c485fe7b6e6dd703b363c9e6993b117","finalBranchHead":"f11f76210fc41c2f5852cc5bd460f6a79d37b703"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-006.md","tests/unit/executions/state-machine.test.ts","tests/unit/executions/execution-service.test.ts","tests/integration/postgres/executions-lifecycle.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/unit/executions/execution-service.test.ts","tests/integration/postgres/executions-lifecycle.test.ts","tests/integration/postgres/executions-concurrency.test.ts","tests/discrimination/executions-lifecycle.discrimination.test.ts","docs/work-items/WORK-006.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/executions-concurrency.test.ts","tests/integration/postgres/executions-lifecycle.test.ts","docs/work-items/WORK-006.md"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/execution-write-path.test.ts","tests/discrimination/executions-lifecycle.discrimination.test.ts","docs/work-items/WORK-006.md"]},"EXECUTION-PROVENANCE":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/execution-write-path.test.ts","tests/unit/executions/execution-service.test.ts","tests/integration/postgres/executions-schema.test.ts","tests/integration/postgres/executions-lifecycle.test.ts","docs/work-items/WORK-006.md"]}}
+    },
+    "WORK-008": {
+      "asOf":"2026-08-30T14:34:47Z","branch":"work/WORK-008-artifact-lineage-remediation","baseRevision":"5938013cfe90591b2fa1cd23fec4c1ebbf187dbb","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-008.md","tests/unit/context/stages.test.ts","tests/unit/context/context-compiler.test.ts","tests/unit/artifacts/artifact-service.test.ts","tests/unit/artifacts/filesystem-store.test.ts","tests/unit/artifacts/lineage-identity.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/artifacts/artifact-service.test.ts","tests/unit/context/reproducibility.test.ts","tests/discrimination/context-reproducibility.discrimination.test.ts","tests/unit/artifacts/lineage-identity.test.ts","tests/discrimination/artifact-lineage-identity.discrimination.test.ts"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/artifacts/artifact-service.test.ts","tests/unit/artifacts/filesystem-store.test.ts","docs/work-items/WORK-008.md","tests/unit/artifacts/lineage-identity.test.ts"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/artifact-store-surface.test.ts","docs/work-items/WORK-008.md","tests/discrimination/artifact-lineage-identity.discrimination.test.ts"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/context/context-compiler.test.ts","tests/unit/context/reproducibility.test.ts","docs/work-items/WORK-008.md","tests/unit/artifacts/lineage-identity.test.ts"]}}
+    },
+    "WORK-009": {
+      "asOf":"2026-08-30T19:30:00Z","branch":"work/WORK-009-deterministic-first-planner","baseRevision":"15ea1961406686fa2770212dc322645f52082ca6","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-009.md","tests/unit/planning/task-profile.test.ts","tests/unit/planning/execution-plan.test.ts","tests/unit/planning/sufficiency.test.ts","tests/unit/planning/strategy-selection.test.ts","tests/unit/planning/planner-service.test.ts","tests/unit/planning/subgraph-evidence.test.ts","tests/integration/postgres/planning-decisions.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/unit/planning/planner-service.test.ts","tests/unit/executions/planning-record.test.ts","tests/integration/postgres/planning-decisions.test.ts","docs/work-items/WORK-009.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/planning-decisions.test.ts","docs/work-items/WORK-009.md"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/planner-surface.test.ts","tests/discrimination/planner-deterministic-first.discrimination.test.ts","docs/work-items/WORK-009.md"]}}
+    },
+    "WORK-010": {
+      "asOf":"2026-08-30T20:08:00Z","branch":"work/WORK-010-governed-tool-runtime","baseRevision":"31206d3f03d5f5810e38e3f8f3863b3e6f8e3f04","assuranceProfile":"CRITICAL","mergedAs":{"pr":19,"mergeCommit":"0bc6b9434c222e92f9dbd7ceeb9577d1d0755f25","implementationHead":"de6f3bdd3d43d0af6fe41772120361f1a90af8b1","finalBranchHead":"354e13c186d72b48dc7010b868f134107b5b371e"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-010.md","tests/unit/tools/tool-contract.test.ts","tests/unit/tools/tool-registry.test.ts","tests/unit/tools/tool-runtime.test.ts","tests/integration/postgres/tools-runtime.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/unit/tools/tool-runtime.test.ts","tests/integration/postgres/tools-runtime.test.ts","tests/integration/postgres/tools-schema.test.ts","tests/discrimination/tool-runtime.discrimination.test.ts","docs/work-items/WORK-010.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/tools-runtime.test.ts","tests/integration/postgres/tools-schema.test.ts","tests/unit/tools/tool-runtime.test.ts","docs/work-items/WORK-010.md"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/tool-runtime-boundary.test.ts","tests/discrimination/tool-runtime.discrimination.test.ts","docs/work-items/WORK-010.md"]}}
+    },
+    "WORK-011": {
+      "asOf":"2026-08-30T22:12:00Z","branch":"work/WORK-011-agent-fabric","baseRevision":"4621622ba596b2ccd33c5f007bb0137b187a9721","assuranceProfile":"HIGH_ASSURANCE","mergedAs":{"pr":21,"mergeCommit":"d06f2a7f7806e1cf60907dbe4891b7a2892f0fa4","implementationHead":"7320e89cf93d1818455752887b85128c67063b00","finalBranchHead":"57e954cdfcf1e6e50bf75c5ae1c660701cc53b88"},
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"accepted","verdict":"passed","evidence":["docs/work-items/WORK-011.md","tests/unit/agents/domain.test.ts","tests/unit/agents/agent-registry.test.ts","tests/unit/agents/session-service.test.ts","tests/integration/postgres/agents-registry.test.ts","tests/integration/postgres/agents-sessions.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/agents-registry.test.ts","tests/integration/postgres/agents-sessions.test.ts","tests/discrimination/agent-fabric.discrimination.test.ts","docs/work-items/WORK-011.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"accepted","verdict":"passed","evidence":["tests/integration/postgres/agents-registry.test.ts","tests/integration/postgres/agents-sessions.test.ts","docs/work-items/WORK-011.md"]},"SELF-HOSTING-BOUNDARY":{"status":"accepted","verdict":"passed","evidence":["tests/architecture/agent-fabric-boundary.test.ts","tests/discrimination/agent-fabric.discrimination.test.ts","docs/work-items/WORK-011.md"]}}
+    },
+    "WORK-013": {
+      "asOf":"2026-08-30T23:30:00Z","branch":"work/WORK-013-verification-authority","baseRevision":"2310df99e167ee15fb3c080b2af50e9449abfcfc","assuranceProfile":"CRITICAL",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-013.md","tests/unit/verification/verification-service.test.ts","tests/integration/postgres/verification-runtime.test.ts","tests/integration/postgres/verification-evidence.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/verification-runtime.test.ts","tests/integration/postgres/verification-schema.test.ts","tests/discrimination/verification-authority.discrimination.test.ts","docs/work-items/WORK-013.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/verification-runtime.test.ts","docs/work-items/WORK-013.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/verification-boundary.test.ts","tests/discrimination/verification-authority.discrimination.test.ts","docs/work-items/WORK-013.md"]},"VERIFICATION-SEPARATION":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/discrimination/verification-authority.discrimination.test.ts","tests/architecture/verification-boundary.test.ts","tests/integration/postgres/verification-schema.test.ts","docs/work-items/WORK-013.md"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/verification-runtime.test.ts","tests/integration/postgres/verification-evidence.test.ts","docs/work-items/WORK-013.md"]}}
+    },
+    "WORK-012": {
+      "asOf":"2026-08-31T07:05:00Z","branch":"work/WORK-012-sandbox-compute","baseRevision":"cb3498735b4fd6f3b95ec27ad500bf06d0b93ebf","assuranceProfile":"CRITICAL",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-012.md","tests/unit/sandbox/domain.test.ts","tests/unit/sandbox/environment-catalog.test.ts","tests/unit/sandbox/sandbox-service.test.ts","tests/unit/sandbox/platform-seam.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/sandbox-environments.test.ts","tests/integration/postgres/sandbox-executions.test.ts","tests/discrimination/sandbox.discrimination.test.ts","docs/work-items/WORK-012.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/sandbox-executions.test.ts","tests/integration/postgres/sandbox-schema.test.ts","docs/work-items/WORK-012.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/sandbox-boundary.test.ts","tests/discrimination/sandbox.discrimination.test.ts","docs/work-items/WORK-012.md"]}}
+    },
+    "WORK-014": {
+      "asOf":"2026-09-15T11:30:00Z","branch":"work/WORK-014-learning-telemetry","baseRevision":"814eab0f1a8e7bb5eb64f980c8152e6fbc52128f","assuranceProfile":"STANDARD",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-014.md","tests/unit/learning/learning-service.test.ts","tests/integration/postgres/learning-telemetry.test.ts","tests/integration/postgres/learning-scorecards.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/learning-telemetry.test.ts","tests/integration/postgres/learning-scorecards.test.ts","tests/discrimination/learning-nonauthority.discrimination.test.ts","docs/work-items/WORK-014.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/learning-telemetry.test.ts","tests/integration/postgres/learning-scorecards.test.ts","docs/work-items/WORK-014.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/learning-boundary.test.ts","tests/discrimination/learning-nonauthority.discrimination.test.ts","tests/integration/postgres/learning-shadow.test.ts","docs/work-items/WORK-014.md"]},"LEARNING-NONAUTHORITY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/discrimination/learning-nonauthority.discrimination.test.ts","tests/architecture/learning-boundary.test.ts","tests/integration/postgres/learning-shadow.test.ts","docs/work-items/WORK-014.md"]}}
+    },
+    "WORK-015": {
+      "asOf":"2026-08-31T14:51:00Z","branch":"work/WORK-015-public-api","baseRevision":"db2f6665cc18528521c30b8f54935d2108e9d362","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-015.md","tests/unit/api/executions-routes.test.ts","tests/integration/postgres/api-surface.test.ts","tests/unit/sdk/client.test.ts","tests/unit/cli/cli.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/api-surface.test.ts","tests/unit/api/executions-routes.test.ts","tests/discrimination/public-surface.discrimination.test.ts","docs/work-items/WORK-015.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/api-surface.test.ts","docs/work-items/WORK-015.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/public-surface.test.ts","tests/architecture/dependency-direction.test.ts","tests/discrimination/public-surface.discrimination.test.ts","docs/work-items/WORK-015.md"]}}
+    },
+    "WORK-016": {
+      "asOf":"2026-08-31T16:02:00Z","branch":"work/WORK-016-workflowos-integration","baseRevision":"999a90eb4d7af1a743156e27549a15276162f656","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-016.md","tests/unit/integrations/workflowos-service.test.ts","tests/unit/integrations/byoa-interop.test.ts","tests/unit/integrations/benchmark-harness.test.ts","tests/integration/postgres/integrations-workflowos.test.ts","tests/integration/postgres/integrations-byoa.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/integrations-workflowos.test.ts","tests/unit/integrations/workflowos-service.test.ts","tests/discrimination/integrations-boundary.discrimination.test.ts","docs/work-items/WORK-016.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/integrations-workflowos.test.ts","docs/work-items/WORK-016.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/integrations-boundary.test.ts","tests/discrimination/integrations-boundary.discrimination.test.ts","docs/work-items/WORK-016.md"]}}
+    },
+    "WORK-017": {
+      "asOf":"2026-08-31T18:30:00Z","branch":"work/WORK-017-tool-composition-learning","baseRevision":"d35c5b6f664b3418e90fcdb20e2eb5d3cc0d936d","assuranceProfile":"STANDARD",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-017.md","tests/unit/learning/composition-domain.test.ts","tests/unit/learning/composition-analysis.test.ts","tests/unit/learning/composition-advisor.test.ts","tests/unit/planning/composition-consultation.test.ts","tests/unit/planning/planner-composition.test.ts","tests/integration/postgres/learning-compositions.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/learning-compositions.test.ts","tests/unit/learning/composition-advisor.test.ts","tests/discrimination/composition-nonauthority.discrimination.test.ts","docs/work-items/WORK-017.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/learning-compositions.test.ts","docs/work-items/WORK-017.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/composition-boundary.test.ts","tests/discrimination/composition-nonauthority.discrimination.test.ts","docs/work-items/WORK-017.md"]},"LEARNING-NONAUTHORITY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/learning-boundary.test.ts","tests/architecture/composition-boundary.test.ts","tests/discrimination/composition-nonauthority.discrimination.test.ts","docs/work-items/WORK-017.md"]}}
+    },
+    "WORK-032": {
+      "asOf":"2026-09-01T05:25:00Z","branch":"work/WORK-032-economic-actions","baseRevision":"3e974984e8ebc12ae062c7ff0c131b2bff2e6acb","assuranceProfile":"CRITICAL",
+      "outcomes":{"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/economics/idempotency.test.ts","tests/unit/economics/economic-action-contract.test.ts","tests/integration/postgres/economic-actions.test.ts","tests/discrimination/economic-actions.discrimination.test.ts","docs/work-items/WORK-032.md"]},"ECONOMIC-AUTHORITY-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/economics/authorization-constraints.test.ts","tests/unit/economics/service-ordering.test.ts","tests/unit/economics/rails.test.ts","tests/unit/economics/machine-payment.test.ts","tests/architecture/integrations-boundary.test.ts","tests/discrimination/economic-actions.discrimination.test.ts","tests/integration/postgres/economic-actions.test.ts","docs/work-items/WORK-032.md"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/economics/settlement-delivery.test.ts","tests/unit/executions/step-events.test.ts","tests/integration/postgres/economic-actions.test.ts","tests/discrimination/economic-actions.discrimination.test.ts","docs/work-items/WORK-032.md"]}}
+    },
+    "WORK-018": {
+      "asOf":"2026-08-31T19:55:00Z","branch":"work/WORK-018-tool-synthesis","baseRevision":"95159210bd056ffb034d27da1b31ac4d0aca2074","assuranceProfile":"CRITICAL",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-018.md","tests/unit/tools/synthesis-domain.test.ts","tests/unit/tools/synthesis-service.test.ts","tests/unit/learning/tool-fact-origins.test.ts","tests/integration/postgres/tools-synthesis.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/tools-synthesis.test.ts","tests/unit/tools/synthesis-service.test.ts","tests/discrimination/tool-synthesis.discrimination.test.ts","docs/work-items/WORK-018.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/tools-synthesis.test.ts","src/platform/db/migrations/0011_tool_synthesis.sql","docs/work-items/WORK-018.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/tool-synthesis-boundary.test.ts","tests/discrimination/tool-synthesis.discrimination.test.ts","docs/work-items/WORK-018.md"]}}
+    },
+    "WORK-023": {
+      "asOf":"2026-08-31T20:40:00Z","branch":"work/WORK-023-deployment-fabric","baseRevision":"95159210bd056ffb034d27da1b31ac4d0aca2074","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-023.md","tests/unit/deployments/fabric-domain.test.ts","tests/unit/deployments/fabric-service.test.ts","tests/integration/postgres/deployments-fabric.test.ts"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/deployments-fabric.test.ts","src/platform/db/migrations/0012_deployment_fabric.sql","docs/work-items/WORK-023.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/deployment-fabric-boundary.test.ts","tests/discrimination/deployment-fabric.discrimination.test.ts","docs/work-items/WORK-023.md"]}}
+    },
+    "WORK-031": {
+      "asOf":"2026-08-31T21:25:00Z","branch":"work/WORK-031-substrate-federation","baseRevision":"95159210bd056ffb034d27da1b31ac4d0aca2074","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/substrate-federation-boundary.test.ts","tests/discrimination/substrate-federation.discrimination.test.ts","docs/work-items/WORK-031.md"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/substrate-federation.test.ts","src/modules/planning/domain/substrate-selection.ts","docs/work-items/WORK-031.md"]},"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/unit/capabilities/substrate-federation.test.ts","tests/unit/planning/planner-substrate.test.ts","docs/work-items/WORK-031.md"]}}
+    },
+    "WORK-019": {
+      "asOf":"2026-09-01T16:10:00Z","branch":"work/WORK-019-customer-runners","baseRevision":"ae9c5f1a39ad4579f639917923d992cbe7b9b412","assuranceProfile":"CRITICAL",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-019.md","tests/unit/sandbox/runner-fleet-domain.test.ts","tests/unit/sandbox/runner-fleet-service.test.ts","tests/integration/postgres/runner-fleet.test.ts"]},"IDENTITY-IDEMPOTENCY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/runner-fleet.test.ts","tests/integration/postgres/runner-fleet-concurrency.test.ts","tests/discrimination/runner-fleet.discrimination.test.ts","src/platform/db/migrations/0015_runner_fleet.sql","docs/work-items/WORK-019.md"]},"CONCURRENCY-CRASH-SAFETY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/runner-fleet-concurrency.test.ts","src/platform/db/migrations/0015_runner_fleet.sql","docs/work-items/WORK-019.md"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/runner-fleet-boundary.test.ts","tests/discrimination/runner-fleet.discrimination.test.ts","docs/work-items/WORK-019.md"]}}
+    },
+    "WORK-022": {
+      "asOf":"2026-09-15T13:10:00Z","branch":"work/WORK-022-opportunity-analysis","baseRevision":"ae9c5f1a39ad4579f639917923d992cbe7b9b412","assuranceProfile":"HIGH_ASSURANCE",
+      "outcomes":{"IMPLEMENTATION-COMPLETENESS":{"status":"evidence-recorded","verdict":"passed","evidence":["docs/work-items/WORK-022.md","tests/unit/learning/opportunity-analysis-domain.test.ts","tests/unit/api/codebase-analysis-routes.test.ts","tests/unit/planning/planner-opportunity.test.ts","src/platform/db/migrations/0016_opportunity_analysis.sql"]},"SELF-HOSTING-BOUNDARY":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/architecture/opportunity-analysis-boundary.test.ts","tests/discrimination/opportunity-analysis.discrimination.test.ts","tests/discrimination/lib/opportunity.ts","docs/work-items/WORK-022.md"]},"EXECUTION-PROVENANCE":{"status":"evidence-recorded","verdict":"passed","evidence":["tests/integration/postgres/learning-opportunities.test.ts","tests/integration/postgres/codebase-analysis.test.ts","src/api/routes/codebase-analysis.ts","src/modules/learning/domain/finding-transitions.ts","docs/work-items/WORK-022.md"]}}
+    }
+  },
+  "checkpointKinds": ["readiness","work_order","pr_conformance","verification_entry"],
+  "note": "WORK-001 checkpoints accepted after PR #3 review. WORK-002 checkpoints accepted after PR #4 merge and concurrency remediation. WORK-003 checkpoints accepted after PR #6 round-2 transport-failure remediation and merge. WORK-004 and WORK-005 accepted after the parallel merge wave and state reconciliation. WORK-006 accepted after PR #10 merge. WORK-009 accepted after PR #18 merge. WORK-010 accepted after PR #19 merge. WORK-011 accepted after PR #21 merge; agent identity, immutable versioning, credential mediation, approval-before-side-effect, tenant isolation, session concurrency and execution provenance evidence reviewed and merged. WORK-012 checkpoints evidence-recorded on the WORK-012 branch (compute environments and sandbox manager) pending architect review."
+}
+
+--- spec/development-state/dependency-state.json ---
+{
+  "schemaVersion": 1,
+  "futureGeneration": [
+    "WORK-017",
+    "WORK-018",
+    "WORK-019",
+    "WORK-020",
+    "WORK-021",
+    "WORK-022",
+    "WORK-027",
+    "WORK-028",
+    "WORK-029",
+    "WORK-030",
+    "WORK-031",
+    "WORK-032",
+    "WORK-033",
+    "WORK-034",
+    "WORK-035",
+    "WORK-036",
+    "WORK-037",
+    "WORK-038",
+    "WORK-039",
+    "WORK-040",
+    "WORK-041"
+  ],
+  "dependencies": {
+    "WORK-001": [], "WORK-002": ["WORK-001"], "WORK-003": ["WORK-001","WORK-002"], "WORK-004": ["WORK-001","WORK-002","WORK-003"], "WORK-005": ["WORK-003"], "WORK-006": ["WORK-002","WORK-004","WORK-005"], "WORK-007": ["WORK-003","WORK-004","WORK-005","WORK-006"], "WORK-008": ["WORK-005","WORK-006"], "WORK-009": ["WORK-005","WORK-006","WORK-007","WORK-008"], "WORK-010": ["WORK-006","WORK-007","WORK-008"], "WORK-011": ["WORK-006","WORK-007","WORK-010"], "WORK-012": ["WORK-006","WORK-007","WORK-010","WORK-011"], "WORK-013": ["WORK-006","WORK-009","WORK-010","WORK-011"], "WORK-014": ["WORK-006","WORK-009","WORK-010","WORK-013"], "WORK-015": ["WORK-002","WORK-003","WORK-004","WORK-006","WORK-009","WORK-013"], "WORK-016": ["WORK-006","WORK-007","WORK-009","WORK-010","WORK-011","WORK-013","WORK-015"], "WORK-017": ["WORK-014","WORK-016"], "WORK-018": ["WORK-010","WORK-012","WORK-014","WORK-017"], "WORK-019": ["WORK-012","WORK-016","WORK-018"], "WORK-020": ["WORK-014","WORK-017","WORK-018","WORK-019"], "WORK-021": ["WORK-013","WORK-014","WORK-017","WORK-018"], "WORK-022": ["WORK-014","WORK-016","WORK-018"], "WORK-023": ["WORK-011","WORK-012","WORK-015","WORK-016"], "WORK-024": ["WORK-023"], "WORK-025": ["WORK-023"], "WORK-026": ["WORK-009","WORK-010","WORK-013","WORK-023"], "WORK-027": ["WORK-010","WORK-012","WORK-013","WORK-031"], "WORK-028": ["WORK-006","WORK-007","WORK-010","WORK-011","WORK-012","WORK-031"], "WORK-029": ["WORK-012","WORK-016","WORK-019","WORK-031"], "WORK-030": ["WORK-012","WORK-013","WORK-016","WORK-019","WORK-031"], "WORK-031": ["WORK-006","WORK-007","WORK-008","WORK-010","WORK-011","WORK-012","WORK-013","WORK-014","WORK-016"], "WORK-032": ["WORK-004","WORK-006","WORK-007","WORK-013","WORK-015","WORK-016","WORK-017"], "WORK-033": ["WORK-015","WORK-023","WORK-027","WORK-028","WORK-029","WORK-030","WORK-032","WORK-034"], "WORK-034": ["WORK-015","WORK-022","WORK-032"], "WORK-035": ["WORK-033","WORK-034"], "WORK-036": ["WORK-035"], "WORK-037": ["WORK-036"], "WORK-038": ["WORK-037"], "WORK-039": ["WORK-038"], "WORK-040": ["WORK-039"], "WORK-041": ["WORK-040"], "WORK-042": ["WORK-041"], "WORK-043": ["WORK-042"], "WORK-044": ["WORK-043"], "WORK-045": ["WORK-044"], "WORK-046": ["WORK-045"], "WORK-047": ["WORK-046"], "WORK-048": ["WORK-047"]
+  }
+}
+
+--- spec/development-state/frontier-state.json ---
+{
+  "schemaVersion": 1,
+  "status": "active",
+  "governingArchitectureVersion": "v1.0",
+  "eligible": ["WORK-048"],
+  "inFlight": [],
+  "blocked": [],
