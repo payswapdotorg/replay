@@ -88,8 +88,10 @@ def _find(name):
             found = None  # invalidated / retired
         elif s.get("stage") == "capacity":
             found = None  # capacity-staged: the aggressive assault re-dispatch owns it
-        elif s.get("action") != "tab-reopen":
-            found = s  # latest create record wins
+        else:
+            found = s  # latest create OR tab-reopen record wins (a tab-reopen
+            # record carries the session's CURRENT tab_id+url and no later
+            # create exists for it — it IS the live location)
     return found
 
 
@@ -316,7 +318,9 @@ def _active_session_keywords(extra=None):
     for n, s in last.items():
         if s.get("action") in ("void", "failed", "done"):
             continue  # retired: its sandbox is no longer an active job
-        if not s.get("sent"):
+        # a tab-reopen record continues a LIVE session on a new tab — it
+        # carries no `sent` field of its own but the session is live.
+        if not s.get("sent") and s.get("action") != "tab-reopen":
             continue
         if n:
             kws.append(n)
@@ -324,6 +328,14 @@ def _active_session_keywords(extra=None):
             if wo != n:
                 kws.append(wo)
                 kws.append(wo.upper())  # 'wo-009' -> 'WO-009'
+            # sandbox rows are named after the task TITLE (e.g. 'WORK-053
+            # Implementation Guide') — 'WO-053' is NOT a substring of that.
+            # Always add the WORK-<num> variant and the bare number.
+            import re as _re
+            m = _re.match(r"^[Ww][Oo]-(\d+)$", n.strip())
+            if m:
+                kws.append(f"WORK-{m.group(1)}")
+                kws.append(m.group(1))
         # the session UUID from the recorded URL (modal rows use it as name)
         u = s.get("url") or ""
         if "/c/" in u:
