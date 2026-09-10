@@ -80,7 +80,7 @@ def rotate_logs():
     for name in ("watcher.log", "channel.log"):
         p = os.path.join(BASE, name)
         _rotate(p)
-    for name in ("supervisor.log",):
+    for name in ("supervisor.log", "monitor_worker.log"):
         _rotate(os.path.join(LOGDIR, name))
     _rotate(os.path.join(BASE, "dev.log"))
 
@@ -126,6 +126,58 @@ def ensure_capacity_recovery():
         start_new_session=True,
     )
     out.close()
+
+
+def ensure_worker_monitor():
+    """Keep the resident worker-session monitor alive while its flag exists.
+
+    Flag (flags/worker_monitor.json): {"name": "WO-055", "minutes": 600,
+    "expires_ts": <epoch>}. While the flag exists and unexpired, a dead
+    monitor_worker.py is relaunched automatically (the resident Tech Lead's
+    bash children die with each tool call; this supervisor is immortal, so
+    IT owns the monitor process). Remove the flag to stop relaunches.
+    """
+    flag = os.path.join(FLAGS, "worker_monitor.json")
+    pidf = os.path.join(FLAGS, "worker_monitor.pid")
+    try:
+        spec = json.load(open(flag))
+    except Exception:
+        return
+    exp = spec.get("expires_ts") or 0
+    if exp and time.time() > exp:
+        try:
+            os.remove(flag)
+            log("worker monitor flag expired — removed")
+        except Exception:
+            pass
+        return
+    name = spec.get("name", "")
+    minutes = spec.get("minutes", 600)
+    if not name:
+        return
+    pid = read_pid(pidf)
+    if pid and pid_alive(pid, "monitor_worker.py"):
+        return  # alive
+    r = subprocess.run(["pgrep", "-f", f"monitor_worker.py {name}"],
+                       capture_output=True, text=True)
+    if r.stdout.strip():
+        try:
+            open(pidf, "w").write(r.stdout.strip().split("\n")[0])
+        except Exception:
+            pass
+        return  # alive (pidfile was stale)
+    log(f"worker monitor dead but flag present — relaunching for {name}")
+    out = open(os.path.join(LOGDIR, "monitor_worker.log"), "a")
+    proc = subprocess.Popen(
+        [PY, os.path.join(BASE, "monitor_worker.py"), name, str(minutes)],
+        stdout=out, stderr=out, stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    out.close()
+    try:
+        open(pidf, "w").write(str(proc.pid))
+    except Exception:
+        pass
 
 
 def ensure_watcher():
@@ -250,6 +302,7 @@ def main():
             ensure_watcher()
             ensure_replayd()
             ensure_capacity_recovery()
+            ensure_worker_monitor()
             if cycle % 3 == 0:          # browser check every ~30s
                 ensure_browser()
                 ensure_dev()
